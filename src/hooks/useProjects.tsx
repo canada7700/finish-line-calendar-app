@@ -94,6 +94,52 @@ export const useProjects = () => {
     }
   });
 
+  // Update project mutation
+  const updateProjectMutation = useMutation({
+    mutationFn: async (project: Project) => {
+      console.log('Updating project in Supabase:', project);
+      const { data, error } = await supabase
+        .from('projects')
+        .update({
+          job_name: project.jobName,
+          job_description: project.jobDescription,
+          shop_hrs: project.shopHrs,
+          stain_hrs: project.stainHrs,
+          install_hrs: project.installHrs,
+          install_date: project.installDate,
+          material_order_date: project.materialOrderDate,
+          box_toekick_assembly_date: project.boxToekickAssemblyDate,
+          milling_fillers_date: project.millingFillersDate,
+          stain_lacquer_date: project.stainLacquerDate,
+          shop_start_date: project.shopStartDate,
+          stain_start_date: project.stainStartDate,
+          status: project.status
+        })
+        .eq('id', project.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating project:', error);
+        throw error;
+      }
+
+      console.log('Project updated successfully:', data);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+    onError: (error) => {
+      console.error('Failed to update project:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update project. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
   // Delete project mutation
   const deleteProjectMutation = useMutation({
     mutationFn: async (projectId: string) => {
@@ -133,6 +179,8 @@ export const useProjects = () => {
     error,
     addProject: addProjectMutation.mutate,
     isAddingProject: addProjectMutation.isPending,
+    updateProject: updateProjectMutation.mutate,
+    isUpdatingProject: updateProjectMutation.isPending,
     deleteProject: deleteProjectMutation.mutate,
     isDeletingProject: deleteProjectMutation.isPending
   };

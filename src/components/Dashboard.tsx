@@ -14,7 +14,7 @@ import { useProjects } from '../hooks/useProjects';
 import { toast } from '@/hooks/use-toast';
 
 const Dashboard = () => {
-  const { projects, isLoading, addProject, isAddingProject, deleteProject } = useProjects();
+  const { projects, isLoading, addProject, isAddingProject, deleteProject, updateProject, isUpdatingProject } = useProjects();
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState('projects');
   const [allPhases, setAllPhases] = useState<ProjectPhase[]>([]);
@@ -68,15 +68,57 @@ const Dashboard = () => {
         description: `Recalculating dates for ${projects.length} projects with ${holidayStatus.holidays.length} holidays loaded.`,
       });
       
-      // This will trigger the useEffect to regenerate phases
+      // Clear phases first to prevent showing outdated data
       setAllPhases([]);
       
-      setTimeout(() => {
-        toast({
-          title: "Recalculation Complete",
-          description: "All project dates have been recalculated to respect holidays and weekends.",
-        });
-      }, 1000);
+      // Recalculate each project's dates and update in database
+      const updatePromises = projects.map(async (project) => {
+        try {
+          console.log(`📅 Recalculating dates for project: ${project.jobName}`);
+          console.log('📅 Original dates:', {
+            install: project.installDate,
+            shopStart: project.shopStartDate,
+            stainStart: project.stainStartDate,
+            stainEnd: project.stainLacquerDate
+          });
+          
+          // Recalculate project dates
+          const recalculatedProject = await ProjectScheduler.calculateProjectDates(project);
+          
+          console.log('📅 Recalculated dates:', {
+            install: recalculatedProject.installDate,
+            shopStart: recalculatedProject.shopStartDate,
+            stainStart: recalculatedProject.stainStartDate,
+            stainEnd: recalculatedProject.stainLacquerDate
+          });
+          
+          // Update the project in the database with new dates
+          await new Promise<void>((resolve, reject) => {
+            updateProject(recalculatedProject, {
+              onSuccess: () => {
+                console.log(`✅ Updated project ${project.jobName} with new dates`);
+                resolve();
+              },
+              onError: (error) => {
+                console.error(`❌ Failed to update project ${project.jobName}:`, error);
+                reject(error);
+              }
+            });
+          });
+          
+        } catch (error) {
+          console.error(`❌ Error recalculating project ${project.jobName}:`, error);
+          throw error;
+        }
+      });
+      
+      // Wait for all projects to be updated
+      await Promise.all(updatePromises);
+      
+      toast({
+        title: "Recalculation Complete",
+        description: "All project dates have been recalculated and updated to respect holidays and weekends.",
+      });
       
     } catch (error) {
       console.error('❌ Error recalculating projects:', error);
@@ -185,7 +227,7 @@ const Dashboard = () => {
                 onClick={handleRecalculateAll} 
                 variant="outline" 
                 size="sm"
-                disabled={isRecalculating}
+                disabled={isRecalculating || isUpdatingProject}
                 className="flex items-center gap-2"
               >
                 <RefreshCw className={`h-4 w-4 ${isRecalculating ? 'animate-spin' : ''}`} />
