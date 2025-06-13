@@ -4,7 +4,7 @@ import { ProjectPhase } from '../types/project';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, isWeekend, getDay } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isWeekend, getDay, startOfWeek, endOfWeek } from 'date-fns';
 
 interface CalendarViewProps {
   phases: ProjectPhase[];
@@ -15,7 +15,11 @@ const CalendarView = ({ phases }: CalendarViewProps) => {
   
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
-  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  
+  // Get the full calendar grid including days from previous/next month
+  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 }); // Start on Sunday
+  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 }); // End on Saturday
+  const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
   const getPhasesForDate = (date: Date) => {
     return phases.filter(phase => {
@@ -26,7 +30,6 @@ const CalendarView = ({ phases }: CalendarViewProps) => {
   };
 
   const isNonWorkingDay = (date: Date) => {
-    // Debug logging to track the issue
     const dayOfWeek = getDay(date);
     const isWeekendDay = isWeekend(date);
     
@@ -43,9 +46,13 @@ const CalendarView = ({ phases }: CalendarViewProps) => {
 
   const getDayClasses = (date: Date, dayPhases: ProjectPhase[]) => {
     const nonWorkingInfo = isNonWorkingDay(date);
+    const isCurrentMonth = date >= monthStart && date <= monthEnd;
+    
     let classes = "min-h-[100px] p-1 border border-border rounded-sm ";
     
-    if (nonWorkingInfo.isNonWorking) {
+    if (!isCurrentMonth) {
+      classes += "bg-gray-50 opacity-50 "; // Gray out days from other months
+    } else if (nonWorkingInfo.isNonWorking) {
       classes += "bg-gray-100 opacity-75 ";
     } else {
       classes += "bg-card ";
@@ -91,10 +98,11 @@ const CalendarView = ({ phases }: CalendarViewProps) => {
         </div>
         
         <div className="grid grid-cols-7 gap-1">
-          {daysInMonth.map(day => {
+          {calendarDays.map(day => {
             const dayPhases = getPhasesForDate(day);
             const nonWorkingInfo = isNonWorkingDay(day);
             const hasSchedulingConflict = dayPhases.length > 0 && nonWorkingInfo.isNonWorking;
+            const isCurrentMonth = day >= monthStart && day <= monthEnd;
             
             return (
               <div
@@ -102,7 +110,7 @@ const CalendarView = ({ phases }: CalendarViewProps) => {
                 className={getDayClasses(day, dayPhases)}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <div className="text-sm font-medium text-foreground">
+                  <div className={`text-sm font-medium ${isCurrentMonth ? 'text-foreground' : 'text-gray-400'}`}>
                     {format(day, 'd')}
                   </div>
                   {hasSchedulingConflict && (
@@ -110,7 +118,7 @@ const CalendarView = ({ phases }: CalendarViewProps) => {
                   )}
                 </div>
                 
-                {nonWorkingInfo.isNonWorking && (
+                {nonWorkingInfo.isNonWorking && isCurrentMonth && (
                   <div className="text-xs text-gray-600 mb-1">
                     {nonWorkingInfo.reason}
                   </div>
