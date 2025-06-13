@@ -6,6 +6,7 @@ import ProjectCard from './ProjectCard';
 import ProjectForm from './ProjectForm';
 import CalendarView from './CalendarView';
 import ProjectListView from './ProjectListView';
+import TeamWorkloadOverview from './TeamWorkloadOverview';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Calendar, LayoutGrid, List } from 'lucide-react';
@@ -96,7 +97,7 @@ const Dashboard = () => {
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-2xl font-bold text-foreground">Cabinet Finishing Scheduler</h1>
-              <p className="text-muted-foreground">Manage your cabinet projects and scheduling</p>
+              <p className="text-muted-foreground">Manage your cabinet projects and team scheduling</p>
             </div>
             <Button onClick={() => setShowForm(true)} className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
@@ -129,6 +130,11 @@ const Dashboard = () => {
             <div className="text-2xl font-bold text-emerald-600">{statusCounts.completed}</div>
             <div className="text-sm text-muted-foreground">Completed</div>
           </div>
+        </div>
+
+        {/* Team Workload Overview */}
+        <div className="mb-8">
+          <TeamWorkloadOverview />
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">

@@ -5,10 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Calendar, Clock, Users, Trash2, Plus } from 'lucide-react';
+import { Calendar, Clock, Trash2, Plus } from 'lucide-react';
 import { useHolidays } from '../hooks/useHolidays';
 import { useSettings } from '../hooks/useSettings';
 import { format } from 'date-fns';
+import TeamMemberManager from '../components/TeamMemberManager';
 
 const Settings = () => {
   const { holidays, addHoliday, deleteHoliday, isAddingHoliday, isDeletingHoliday } = useHolidays();
@@ -57,6 +58,9 @@ const Settings = () => {
         <Separator />
 
         <div className="grid gap-6">
+          {/* Team Management Section */}
+          <TeamMemberManager />
+
           {/* Holidays Section */}
           <Card>
             <CardHeader>
@@ -165,35 +169,6 @@ const Settings = () => {
               <Button onClick={handleUpdateWorkingHours} disabled={isUpdating}>
                 {isUpdating ? 'Saving...' : 'Save Working Hours'}
               </Button>
-            </CardContent>
-          </Card>
-
-          {/* Team Management Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Team Management
-              </CardTitle>
-              <CardDescription>
-                Manage team members and their access to the cabinet finishing scheduler.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="team-member-email">Add Team Member</Label>
-                <div className="flex gap-2">
-                  <Input id="team-member-email" type="email" placeholder="team@example.com" className="flex-1" />
-                  <Button>Invite</Button>
-                </div>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                <p className="font-medium mb-2">Current team members:</p>
-                <ul className="space-y-1">
-                  <li>• admin@company.com (Owner)</li>
-                  <li>• manager@company.com (Admin)</li>
-                </ul>
-              </div>
             </CardContent>
           </Card>
 

@@ -30,6 +30,57 @@ export type Database = {
         }
         Relationships: []
       }
+      project_assignments: {
+        Row: {
+          assigned_hours: number
+          created_at: string
+          end_date: string | null
+          id: string
+          phase: string
+          project_id: string
+          start_date: string | null
+          team_member_id: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_hours?: number
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          phase: string
+          project_id: string
+          start_date?: string | null
+          team_member_id: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_hours?: number
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          phase?: string
+          project_id?: string
+          start_date?: string | null
+          team_member_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_assignments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_assignments_team_member_id_fkey"
+            columns: ["team_member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           box_toekick_assembly_date: string | null
@@ -108,6 +159,48 @@ export type Database = {
           key?: string
           updated_at?: string
           value?: Json
+        }
+        Relationships: []
+      }
+      team_members: {
+        Row: {
+          can_do_install: boolean
+          can_do_shop: boolean
+          can_do_stain: boolean
+          created_at: string
+          email: string | null
+          hourly_rate: number | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+          weekly_hours: number
+        }
+        Insert: {
+          can_do_install?: boolean
+          can_do_shop?: boolean
+          can_do_stain?: boolean
+          created_at?: string
+          email?: string | null
+          hourly_rate?: number | null
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+          weekly_hours?: number
+        }
+        Update: {
+          can_do_install?: boolean
+          can_do_shop?: boolean
+          can_do_stain?: boolean
+          created_at?: string
+          email?: string | null
+          hourly_rate?: number | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+          weekly_hours?: number
         }
         Relationships: []
       }

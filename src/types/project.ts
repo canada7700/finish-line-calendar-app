@@ -25,4 +25,31 @@ export interface ProjectPhase {
   endDate: string;
   hours: number;
   color: string;
+  assignedMembers?: TeamMember[];
+}
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  email?: string;
+  weeklyHours: number;
+  hourlyRate?: number;
+  canDoShop: boolean;
+  canDoStain: boolean;
+  canDoInstall: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectAssignment {
+  id: string;
+  projectId: string;
+  teamMemberId: string;
+  phase: 'shop' | 'stain' | 'install';
+  assignedHours: number;
+  startDate?: string;
+  endDate?: string;
+  createdAt: string;
+  updatedAt: string;
 }
