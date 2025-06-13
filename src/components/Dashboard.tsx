@@ -8,57 +8,18 @@ import CalendarView from './CalendarView';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Calendar, LayoutGrid } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
+import { useProjects } from '../hooks/useProjects';
 
 const Dashboard = () => {
-  const [projects, setProjects] = useState<Project[]>([
-    {
-      id: '1',
-      jobName: 'RACHEL WARKENTIN',
-      jobDescription: 'CABINETS',
-      shopHrs: 183,
-      stainHrs: 80,
-      installHrs: 102,
-      installDate: '2025-08-15',
-      materialOrderDate: '2025-06-16',
-      boxToekickAssemblyDate: '2025-07-29',
-      millingFillersDate: '2025-07-07',
-      stainLacquerDate: '2025-07-26',
-      status: 'shop'
-    },
-    {
-      id: '2',
-      jobName: 'ANDREA ENG',
-      jobDescription: 'CABINETS',
-      shopHrs: 65,
-      stainHrs: 70,
-      installHrs: 68,
-      installDate: '2025-08-27',
-      materialOrderDate: '2025-06-28',
-      boxToekickAssemblyDate: '2025-08-21',
-      millingFillersDate: '2025-08-03',
-      stainLacquerDate: '2025-08-09',
-      status: 'planning'
-    }
-  ]);
-
+  const { projects, isLoading, addProject, isAddingProject } = useProjects();
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState('projects');
 
   const handleAddProject = (projectData: Omit<Project, 'id'>) => {
-    const newProject: Project = {
-      ...projectData,
-      id: Date.now().toString(),
-    };
-    
-    const calculatedProject = ProjectScheduler.calculateProjectDates(newProject);
-    setProjects(prev => [...prev, calculatedProject]);
+    const calculatedProject = ProjectScheduler.calculateProjectDates(projectData);
+    console.log('Submitting project with calculated dates:', calculatedProject);
+    addProject(calculatedProject);
     setShowForm(false);
-    
-    toast({
-      title: "Project Added",
-      description: `${projectData.jobName} has been added to your schedule.`,
-    });
   };
 
   const allPhases: ProjectPhase[] = projects.flatMap(project =>
@@ -90,7 +51,19 @@ const Dashboard = () => {
           <ProjectForm
             onSubmit={handleAddProject}
             onCancel={() => setShowForm(false)}
+            isSubmitting={isAddingProject}
           />
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading projects...</p>
         </div>
       </div>
     );
@@ -151,15 +124,25 @@ const Dashboard = () => {
           </TabsList>
 
           <TabsContent value="projects" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {projects.map(project => (
-                <ProjectCard
-                  key={project.id}
-                  project={project}
-                  onClick={() => console.log('Project clicked:', project.id)}
-                />
-              ))}
-            </div>
+            {projects.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-gray-500 mb-4">No projects found. Add your first project to get started!</p>
+                <Button onClick={() => setShowForm(true)} className="flex items-center gap-2">
+                  <Plus className="h-4 w-4" />
+                  Add Project
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {projects.map(project => (
+                  <ProjectCard
+                    key={project.id}
+                    project={project}
+                    onClick={() => console.log('Project clicked:', project.id)}
+                  />
+                ))}
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="calendar" className="space-y-6">

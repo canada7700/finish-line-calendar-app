@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon } from 'lucide-react';
@@ -15,9 +14,10 @@ import { cn } from '@/lib/utils';
 interface ProjectFormProps {
   onSubmit: (project: Omit<Project, 'id'>) => void;
   onCancel: () => void;
+  isSubmitting?: boolean;
 }
 
-const ProjectForm = ({ onSubmit, onCancel }: ProjectFormProps) => {
+const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false }: ProjectFormProps) => {
   const [formData, setFormData] = useState({
     jobName: '',
     jobDescription: '',
@@ -32,6 +32,12 @@ const ProjectForm = ({ onSubmit, onCancel }: ProjectFormProps) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!installDate) return;
+
+    console.log('Form submission data:', {
+      ...formData,
+      installDate: format(installDate, 'yyyy-MM-dd'),
+      status: 'planning' as const,
+    });
 
     onSubmit({
       ...formData,
@@ -63,6 +69,7 @@ const ProjectForm = ({ onSubmit, onCancel }: ProjectFormProps) => {
                 onChange={(e) => handleInputChange('jobName', e.target.value)}
                 placeholder="e.g., RACHEL WARKENTIN"
                 required
+                disabled={isSubmitting}
               />
             </div>
             <div className="space-y-2">
@@ -73,6 +80,7 @@ const ProjectForm = ({ onSubmit, onCancel }: ProjectFormProps) => {
                 onChange={(e) => handleInputChange('jobDescription', e.target.value)}
                 placeholder="e.g., CABINETS"
                 required
+                disabled={isSubmitting}
               />
             </div>
           </div>
@@ -87,6 +95,7 @@ const ProjectForm = ({ onSubmit, onCancel }: ProjectFormProps) => {
                 value={formData.shopHrs}
                 onChange={(e) => handleInputChange('shopHrs', parseInt(e.target.value) || 0)}
                 placeholder="183"
+                disabled={isSubmitting}
               />
             </div>
             <div className="space-y-2">
@@ -98,6 +107,7 @@ const ProjectForm = ({ onSubmit, onCancel }: ProjectFormProps) => {
                 value={formData.stainHrs}
                 onChange={(e) => handleInputChange('stainHrs', parseInt(e.target.value) || 0)}
                 placeholder="80"
+                disabled={isSubmitting}
               />
             </div>
             <div className="space-y-2">
@@ -109,6 +119,7 @@ const ProjectForm = ({ onSubmit, onCancel }: ProjectFormProps) => {
                 value={formData.installHrs}
                 onChange={(e) => handleInputChange('installHrs', parseInt(e.target.value) || 0)}
                 placeholder="102"
+                disabled={isSubmitting}
               />
             </div>
           </div>
@@ -123,6 +134,7 @@ const ProjectForm = ({ onSubmit, onCancel }: ProjectFormProps) => {
                     "w-full justify-start text-left font-normal",
                     !installDate && "text-muted-foreground"
                   )}
+                  disabled={isSubmitting}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {installDate ? format(installDate, "PPP") : <span>Pick install date</span>}
@@ -141,10 +153,16 @@ const ProjectForm = ({ onSubmit, onCancel }: ProjectFormProps) => {
           </div>
 
           <div className="flex gap-3 pt-4">
-            <Button type="submit" className="flex-1">
-              Add Project
+            <Button type="submit" className="flex-1" disabled={isSubmitting}>
+              {isSubmitting ? 'Adding Project...' : 'Add Project'}
             </Button>
-            <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={onCancel} 
+              className="flex-1"
+              disabled={isSubmitting}
+            >
               Cancel
             </Button>
           </div>
