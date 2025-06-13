@@ -11,46 +11,50 @@ export class ProjectScheduler {
   // Load holidays from database
   static async loadHolidays() {
     if (this.holidaysLoaded) {
+      console.log('Holidays already loaded, skipping reload');
       return; // Already loaded, avoid duplicate requests
     }
     
     try {
-      console.log('Loading holidays from database...');
+      console.log('🔄 Loading holidays from database...');
       const { data, error } = await supabase
         .from('holidays')
         .select('date');
       
       if (error) {
-        console.error('Error loading holidays:', error);
+        console.error('❌ Error loading holidays:', error);
         return;
       }
       
       // Store holidays as YYYY-MM-DD strings for consistent comparison
       this.holidays = data.map(h => h.date);
       this.holidaysLoaded = true;
-      console.log('Loaded holidays:', this.holidays);
+      console.log('✅ Loaded holidays:', this.holidays);
     } catch (error) {
-      console.error('Failed to load holidays:', error);
+      console.error('❌ Failed to load holidays:', error);
     }
   }
   
   // Check if a date is a working day (not weekend, not holiday)
   static isWorkingDay(date: Date): boolean {
+    const dateString = format(date, 'yyyy-MM-dd');
+    
     // Check if it's a weekend
     if (isWeekend(date)) {
-      console.log(`${format(date, 'yyyy-MM-dd')} is a weekend`);
+      console.log(`❌ ${dateString} is a weekend`);
       return false;
     }
     
     // Check if date matches any holiday (compare as YYYY-MM-DD strings)
-    const dateString = format(date, 'yyyy-MM-dd');
     const isHoliday = this.holidays.includes(dateString);
     
     if (isHoliday) {
-      console.log(`${dateString} is a holiday`);
+      console.log(`❌ ${dateString} is a holiday`);
+      return false;
     }
     
-    return !isHoliday;
+    console.log(`✅ ${dateString} is a working day`);
+    return true;
   }
   
   // Add business days to a date (skipping weekends and holidays)
@@ -58,9 +62,9 @@ export class ProjectScheduler {
     let currentDate = new Date(startDate);
     let addedDays = 0;
     let iterations = 0;
-    const maxIterations = daysToAdd * 3; // Safety valve to prevent infinite loops
+    const maxIterations = daysToAdd * 5; // Safety valve to prevent infinite loops
     
-    console.log(`Adding ${daysToAdd} business days to ${format(startDate, 'yyyy-MM-dd')}`);
+    console.log(`🔄 Adding ${daysToAdd} business days to ${format(startDate, 'yyyy-MM-dd')}`);
     
     while (addedDays < daysToAdd && iterations < maxIterations) {
       currentDate = addDays(currentDate, 1);
@@ -68,11 +72,17 @@ export class ProjectScheduler {
       
       if (this.isWorkingDay(currentDate)) {
         addedDays++;
-        console.log(`Added business day ${addedDays}: ${format(currentDate, 'yyyy-MM-dd')}`);
+        console.log(`➕ Added business day ${addedDays}: ${format(currentDate, 'yyyy-MM-dd')}`);
+      } else {
+        console.log(`⏭️ Skipping non-working day: ${format(currentDate, 'yyyy-MM-dd')}`);
       }
     }
     
-    console.log(`Final date after adding ${daysToAdd} business days: ${format(currentDate, 'yyyy-MM-dd')}`);
+    if (iterations >= maxIterations) {
+      console.error('⚠️ Reached maximum iterations while adding business days');
+    }
+    
+    console.log(`✅ Final date after adding ${daysToAdd} business days: ${format(currentDate, 'yyyy-MM-dd')}`);
     return currentDate;
   }
   
@@ -81,9 +91,9 @@ export class ProjectScheduler {
     let currentDate = new Date(startDate);
     let subtractedDays = 0;
     let iterations = 0;
-    const maxIterations = daysToSubtract * 3; // Safety valve
+    const maxIterations = daysToSubtract * 5; // Safety valve
     
-    console.log(`Subtracting ${daysToSubtract} business days from ${format(startDate, 'yyyy-MM-dd')}`);
+    console.log(`🔄 Subtracting ${daysToSubtract} business days from ${format(startDate, 'yyyy-MM-dd')}`);
     
     while (subtractedDays < daysToSubtract && iterations < maxIterations) {
       currentDate = subDays(currentDate, 1);
@@ -91,11 +101,17 @@ export class ProjectScheduler {
       
       if (this.isWorkingDay(currentDate)) {
         subtractedDays++;
-        console.log(`Subtracted business day ${subtractedDays}: ${format(currentDate, 'yyyy-MM-dd')}`);
+        console.log(`➖ Subtracted business day ${subtractedDays}: ${format(currentDate, 'yyyy-MM-dd')}`);
+      } else {
+        console.log(`⏭️ Skipping non-working day: ${format(currentDate, 'yyyy-MM-dd')}`);
       }
     }
     
-    console.log(`Final date after subtracting ${daysToSubtract} business days: ${format(currentDate, 'yyyy-MM-dd')}`);
+    if (iterations >= maxIterations) {
+      console.error('⚠️ Reached maximum iterations while subtracting business days');
+    }
+    
+    console.log(`✅ Final date after subtracting ${daysToSubtract} business days: ${format(currentDate, 'yyyy-MM-dd')}`);
     return currentDate;
   }
   
@@ -105,12 +121,14 @@ export class ProjectScheduler {
     let iterations = 0;
     const maxIterations = 10; // Safety valve
     
+    console.log(`🔄 Finding previous working day from ${format(date, 'yyyy-MM-dd')}`);
+    
     while (!this.isWorkingDay(currentDate) && iterations < maxIterations) {
       currentDate = subDays(currentDate, 1);
       iterations++;
     }
     
-    console.log(`Previous working day from ${format(date, 'yyyy-MM-dd')} is ${format(currentDate, 'yyyy-MM-dd')}`);
+    console.log(`✅ Previous working day from ${format(date, 'yyyy-MM-dd')} is ${format(currentDate, 'yyyy-MM-dd')}`);
     return currentDate;
   }
   
@@ -120,12 +138,14 @@ export class ProjectScheduler {
     let iterations = 0;
     const maxIterations = 10; // Safety valve
     
+    console.log(`🔄 Finding next working day from ${format(date, 'yyyy-MM-dd')}`);
+    
     while (!this.isWorkingDay(currentDate) && iterations < maxIterations) {
       currentDate = addDays(currentDate, 1);
       iterations++;
     }
     
-    console.log(`Next working day from ${format(date, 'yyyy-MM-dd')} is ${format(currentDate, 'yyyy-MM-dd')}`);
+    console.log(`✅ Next working day from ${format(date, 'yyyy-MM-dd')} is ${format(currentDate, 'yyyy-MM-dd')}`);
     return currentDate;
   }
   
@@ -168,18 +188,23 @@ export class ProjectScheduler {
   }
   
   static async calculateProjectDates(project: Project): Promise<Project> {
-    // Load holidays first
+    console.log('🎯 Starting project date calculation for:', project.jobName);
+    
+    // Load holidays first - CRITICAL
     await this.loadHolidays();
     
     // Get working hours
     const { shopHours, stainHours } = await this.getWorkingHours();
     
     const installDate = new Date(project.installDate);
+    console.log('📅 Original install date:', format(installDate, 'yyyy-MM-dd'));
     
-    // Validate install date is a working day
+    // Validate install date is a working day and adjust if needed
+    let finalInstallDate = installDate;
     const installValidation = this.validateWorkingDay(installDate);
     if (!installValidation.isValid) {
-      console.warn(`Install date ${project.installDate} is not a working day. Consider ${format(installValidation.suggestedDate!, 'yyyy-MM-dd')}`);
+      console.warn(`⚠️ Install date ${project.installDate} is not a working day. Adjusting to ${format(installValidation.suggestedDate!, 'yyyy-MM-dd')}`);
+      finalInstallDate = installValidation.suggestedDate!;
     }
     
     // Calculate duration in business days
@@ -187,44 +212,52 @@ export class ProjectScheduler {
     const stainDuration = Math.ceil(project.stainHrs / stainHours);
     const shopDuration = Math.ceil(project.shopHrs / shopHours);
     
-    console.log('Project durations in business days:', { installDuration, stainDuration, shopDuration });
+    console.log('📊 Project durations in business days:', { installDuration, stainDuration, shopDuration });
     
     // Stain must complete before install (1 business day buffer)
-    const stainEndDate = this.getPreviousWorkingDay(installDate);
+    const stainEndDate = this.getPreviousWorkingDay(finalInstallDate);
     const stainStartDate = this.subtractBusinessDays(stainEndDate, stainDuration - 1);
     
     // Shop must complete before stain (1 business day buffer)
     const shopEndDate = this.getPreviousWorkingDay(stainStartDate);
     const shopStartDate = this.subtractBusinessDays(shopEndDate, shopDuration - 1);
     
-    console.log('Calculated project dates:', {
+    const calculatedDates = {
       shopStart: format(shopStartDate, 'yyyy-MM-dd'),
       shopEnd: format(shopEndDate, 'yyyy-MM-dd'),
       stainStart: format(stainStartDate, 'yyyy-MM-dd'),
       stainEnd: format(stainEndDate, 'yyyy-MM-dd'),
-      install: format(installDate, 'yyyy-MM-dd')
-    });
+      install: format(finalInstallDate, 'yyyy-MM-dd')
+    };
+    
+    console.log('✅ Calculated project dates:', calculatedDates);
     
     return {
       ...project,
-      shopStartDate: format(shopStartDate, 'yyyy-MM-dd'),
-      stainStartDate: format(stainStartDate, 'yyyy-MM-dd'),
-      stainLacquerDate: format(stainEndDate, 'yyyy-MM-dd'),
+      installDate: calculatedDates.install, // Update install date if it was adjusted
+      shopStartDate: calculatedDates.shopStart,
+      stainStartDate: calculatedDates.stainStart,
+      stainLacquerDate: calculatedDates.stainEnd,
     };
   }
   
   static async generateProjectPhases(project: Project): Promise<ProjectPhase[]> {
-    // Ensure holidays are loaded
+    console.log('🎭 Generating project phases for:', project.jobName);
+    
+    // Ensure holidays are loaded - CRITICAL
     await this.loadHolidays();
     
     const phases: ProjectPhase[] = [];
     const calculatedProject = await this.calculateProjectDates(project);
     const { shopHours, stainHours } = await this.getWorkingHours();
     
+    // Shop phase
     if (calculatedProject.shopStartDate) {
       const shopDuration = Math.ceil(project.shopHrs / shopHours);
       const shopStartDate = new Date(calculatedProject.shopStartDate);
       const shopEndDate = this.addBusinessDays(shopStartDate, shopDuration - 1);
+      
+      console.log(`🔨 Shop phase: ${calculatedProject.shopStartDate} to ${format(shopEndDate, 'yyyy-MM-dd')} (${shopDuration} days)`);
       
       phases.push({
         id: `${project.id}-shop`,
@@ -238,10 +271,13 @@ export class ProjectScheduler {
       });
     }
     
+    // Stain phase
     if (calculatedProject.stainStartDate) {
       const stainDuration = Math.ceil(project.stainHrs / stainHours);
       const stainStartDate = new Date(calculatedProject.stainStartDate);
       const stainEndDate = this.addBusinessDays(stainStartDate, stainDuration - 1);
+      
+      console.log(`🎨 Stain phase: ${calculatedProject.stainStartDate} to ${format(stainEndDate, 'yyyy-MM-dd')} (${stainDuration} days)`);
       
       phases.push({
         id: `${project.id}-stain`,
@@ -255,22 +291,41 @@ export class ProjectScheduler {
       });
     }
     
+    // Install phase
     const installDuration = Math.ceil(project.installHrs / shopHours);
-    const installStartDate = new Date(project.installDate);
+    const installStartDate = new Date(calculatedProject.installDate);
     const installEndDate = this.addBusinessDays(installStartDate, installDuration - 1);
+    
+    console.log(`🔧 Install phase: ${calculatedProject.installDate} to ${format(installEndDate, 'yyyy-MM-dd')} (${installDuration} days)`);
     
     phases.push({
       id: `${project.id}-install`,
       projectId: project.id,
       projectName: project.jobName,
       phase: 'install',
-      startDate: project.installDate,
+      startDate: calculatedProject.installDate,
       endDate: format(installEndDate, 'yyyy-MM-dd'),
       hours: project.installHrs,
       color: 'bg-green-500'
     });
     
-    console.log('Generated project phases:', phases);
+    console.log('✅ Generated project phases:', phases.length);
     return phases;
+  }
+  
+  // Force refresh holidays (useful for debugging)
+  static forceReloadHolidays() {
+    console.log('🔄 Forcing holiday reload...');
+    this.holidaysLoaded = false;
+    this.holidays = [];
+    return this.loadHolidays();
+  }
+  
+  // Get current holidays (for debugging)
+  static getCurrentHolidays() {
+    return {
+      holidays: this.holidays,
+      loaded: this.holidaysLoaded
+    };
   }
 }

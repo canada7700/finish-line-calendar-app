@@ -9,24 +9,28 @@ import ProjectListView from './ProjectListView';
 import TeamWorkloadOverview from './TeamWorkloadOverview';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Calendar, LayoutGrid, List } from 'lucide-react';
+import { Plus, Calendar, LayoutGrid, List, RefreshCw, Bug } from 'lucide-react';
 import { useProjects } from '../hooks/useProjects';
+import { toast } from '@/hooks/use-toast';
 
 const Dashboard = () => {
   const { projects, isLoading, addProject, isAddingProject, deleteProject } = useProjects();
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState('projects');
   const [allPhases, setAllPhases] = useState<ProjectPhase[]>([]);
+  const [isRecalculating, setIsRecalculating] = useState(false);
 
   // Generate phases asynchronously when projects change
   useEffect(() => {
     const generatePhases = async () => {
+      console.log('🎭 Generating phases for all projects...');
       const phasePromises = projects.map(project => 
         ProjectScheduler.generateProjectPhases(project)
       );
       const phasesArrays = await Promise.all(phasePromises);
       const flattenedPhases = phasesArrays.flat();
       setAllPhases(flattenedPhases);
+      console.log('✅ Generated phases for dashboard:', flattenedPhases.length);
     };
 
     if (projects.length > 0) {
@@ -45,6 +49,74 @@ const Dashboard = () => {
     const { id, ...projectWithoutId } = calculatedProject;
     addProject(projectWithoutId);
     setShowForm(false);
+  };
+
+  const handleRecalculateAll = async () => {
+    setIsRecalculating(true);
+    try {
+      console.log('🔄 Recalculating all project dates...');
+      
+      // Force reload holidays first
+      await ProjectScheduler.forceReloadHolidays();
+      
+      // Show current holiday status
+      const holidayStatus = ProjectScheduler.getCurrentHolidays();
+      console.log('🎄 Current holidays status:', holidayStatus);
+      
+      toast({
+        title: "Recalculation Started",
+        description: `Recalculating dates for ${projects.length} projects with ${holidayStatus.holidays.length} holidays loaded.`,
+      });
+      
+      // This will trigger the useEffect to regenerate phases
+      setAllPhases([]);
+      
+      setTimeout(() => {
+        toast({
+          title: "Recalculation Complete",
+          description: "All project dates have been recalculated to respect holidays and weekends.",
+        });
+      }, 1000);
+      
+    } catch (error) {
+      console.error('❌ Error recalculating projects:', error);
+      toast({
+        title: "Recalculation Failed",
+        description: "There was an error recalculating project dates.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRecalculating(false);
+    }
+  };
+
+  const handleDebugScheduling = () => {
+    const holidayStatus = ProjectScheduler.getCurrentHolidays();
+    console.log('🐛 Debug Info:');
+    console.log('- Projects count:', projects.length);
+    console.log('- Phases count:', allPhases.length);
+    console.log('- Holidays loaded:', holidayStatus.loaded);
+    console.log('- Holidays list:', holidayStatus.holidays);
+    
+    // Test working day check for some common dates
+    const testDates = [
+      new Date('2025-12-25'), // Christmas
+      new Date('2025-01-01'), // New Year
+      new Date('2025-12-21'), // Saturday
+      new Date('2025-12-22'), // Sunday
+      new Date('2025-12-23'), // Monday
+    ];
+    
+    console.log('🔍 Working day tests:');
+    testDates.forEach(date => {
+      const isWorking = ProjectScheduler.isWorkingDay ? ProjectScheduler.isWorkingDay(date) : 'Method not available';
+      console.log(`${date.toDateString()}: ${isWorking}`);
+    });
+    
+    toast({
+      title: "Debug Info Logged",
+      description: "Check the browser console for detailed scheduling debug information.",
+    });
   };
 
   const getStatusCounts = () => {
@@ -99,10 +171,31 @@ const Dashboard = () => {
               <h1 className="text-2xl font-bold text-foreground">Cabinet Finishing Scheduler</h1>
               <p className="text-muted-foreground">Manage your cabinet projects and team scheduling</p>
             </div>
-            <Button onClick={() => setShowForm(true)} className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Add Project
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                onClick={handleDebugScheduling} 
+                variant="outline" 
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <Bug className="h-4 w-4" />
+                Debug
+              </Button>
+              <Button 
+                onClick={handleRecalculateAll} 
+                variant="outline" 
+                size="sm"
+                disabled={isRecalculating}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className={`h-4 w-4 ${isRecalculating ? 'animate-spin' : ''}`} />
+                {isRecalculating ? 'Recalculating...' : 'Recalculate Dates'}
+              </Button>
+              <Button onClick={() => setShowForm(true)} className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Add Project
+              </Button>
+            </div>
           </div>
         </div>
       </div>

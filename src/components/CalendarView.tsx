@@ -3,8 +3,8 @@ import { useState } from 'react';
 import { ProjectPhase } from '../types/project';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths } from 'date-fns';
+import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, isWeekend } from 'date-fns';
 
 interface CalendarViewProps {
   phases: ProjectPhase[];
@@ -25,16 +25,31 @@ const CalendarView = ({ phases }: CalendarViewProps) => {
     });
   };
 
-  const getPhaseDisplayInfo = (phase: ProjectPhase) => {
-    const phaseStart = new Date(phase.startDate);
-    const phaseEnd = new Date(phase.endDate);
+  const isNonWorkingDay = (date: Date) => {
+    // Check if it's a weekend
+    if (isWeekend(date)) {
+      return { isNonWorking: true, reason: 'Weekend' };
+    }
     
-    return {
-      ...phase,
-      isStart: isSameDay(phaseStart, new Date()),
-      isEnd: isSameDay(phaseEnd, new Date()),
-      duration: Math.ceil((phaseEnd.getTime() - phaseStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
-    };
+    // We could add holiday checking here too, but for now just weekends
+    return { isNonWorking: false };
+  };
+
+  const getDayClasses = (date: Date, dayPhases: ProjectPhase[]) => {
+    const nonWorkingInfo = isNonWorkingDay(date);
+    let classes = "min-h-[100px] p-1 border border-border rounded-sm ";
+    
+    if (nonWorkingInfo.isNonWorking) {
+      classes += "bg-gray-100 opacity-75 ";
+    } else {
+      classes += "bg-card ";
+    }
+    
+    if (dayPhases.length > 0 && nonWorkingInfo.isNonWorking) {
+      classes += "border-red-300 border-2 "; // Highlight scheduling conflicts
+    }
+    
+    return classes;
   };
 
   return (
@@ -72,33 +87,63 @@ const CalendarView = ({ phases }: CalendarViewProps) => {
         <div className="grid grid-cols-7 gap-1">
           {daysInMonth.map(day => {
             const dayPhases = getPhasesForDate(day);
+            const nonWorkingInfo = isNonWorkingDay(day);
+            const hasSchedulingConflict = dayPhases.length > 0 && nonWorkingInfo.isNonWorking;
             
             return (
               <div
                 key={day.toISOString()}
-                className="min-h-[100px] p-1 border border-border bg-card rounded-sm"
+                className={getDayClasses(day, dayPhases)}
               >
-                <div className="text-sm font-medium mb-1 text-foreground">
-                  {format(day, 'd')}
+                <div className="flex items-center justify-between mb-1">
+                  <div className="text-sm font-medium text-foreground">
+                    {format(day, 'd')}
+                  </div>
+                  {hasSchedulingConflict && (
+                    <AlertTriangle className="h-3 w-3 text-red-500" title={`Work scheduled on ${nonWorkingInfo.reason}`} />
+                  )}
                 </div>
+                
+                {nonWorkingInfo.isNonWorking && (
+                  <div className="text-xs text-gray-600 mb-1">
+                    {nonWorkingInfo.reason}
+                  </div>
+                )}
                 
                 <div className="space-y-1">
                   {dayPhases.map(phase => (
                     <div
                       key={phase.id}
-                      className={`text-xs p-1 rounded text-white ${phase.color} truncate`}
-                      title={`${phase.projectName} - ${phase.phase.toUpperCase()} (${phase.hours}h)`}
+                      className={`text-xs p-1 rounded text-white ${phase.color} truncate ${hasSchedulingConflict ? 'border border-red-300' : ''}`}
+                      title={`${phase.projectName} - ${phase.phase.toUpperCase()} (${phase.hours}h)${hasSchedulingConflict ? ' - CONFLICT: Scheduled on ' + nonWorkingInfo.reason : ''}`}
                     >
                       {phase.projectName}
                       <div className="text-[10px] opacity-90">
                         {phase.phase.toUpperCase()}
                       </div>
+                      {hasSchedulingConflict && (
+                        <div className="text-[10px] text-red-200">
+                          ⚠️ CONFLICT
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               </div>
             );
           })}
+        </div>
+        
+        <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5" />
+            <div className="text-sm">
+              <div className="font-medium text-yellow-800">Scheduling Conflicts</div>
+              <div className="text-yellow-700">
+                Red borders indicate work scheduled on weekends or holidays. Use the "Recalculate Dates" button to fix these issues.
+              </div>
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>
