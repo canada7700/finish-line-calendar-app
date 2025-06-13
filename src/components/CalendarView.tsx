@@ -100,7 +100,7 @@ const CalendarView = ({ phases }: CalendarViewProps) => {
                     {format(day, 'd')}
                   </div>
                   {hasSchedulingConflict && (
-                    <AlertTriangle className="h-3 w-3 text-red-500" title={`Work scheduled on ${nonWorkingInfo.reason}`} />
+                    <AlertTriangle className="h-3 w-3 text-red-500" />
                   )}
                 </div>
                 
