@@ -63,7 +63,7 @@ const CalendarView = ({ phases }: CalendarViewProps) => {
       <CardContent>
         <div className="grid grid-cols-7 gap-1 mb-4">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-            <div key={day} className="p-2 text-center font-medium text-gray-600 text-sm">
+            <div key={day} className="p-2 text-center font-medium text-muted-foreground text-sm">
               {day}
             </div>
           ))}
@@ -76,9 +76,9 @@ const CalendarView = ({ phases }: CalendarViewProps) => {
             return (
               <div
                 key={day.toISOString()}
-                className="min-h-[100px] p-1 border border-gray-200 bg-white rounded-sm"
+                className="min-h-[100px] p-1 border border-border bg-card rounded-sm"
               >
-                <div className="text-sm font-medium mb-1">
+                <div className="text-sm font-medium mb-1 text-foreground">
                   {format(day, 'd')}
                 </div>
                 
