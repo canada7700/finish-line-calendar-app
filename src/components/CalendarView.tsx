@@ -1,10 +1,11 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ProjectPhase } from '../types/project';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isWeekend, getDay, startOfWeek, endOfWeek } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isWeekend, getDay, startOfWeek, endOfWeek, parseISO, eachWeekendOfInterval } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CalendarViewProps {
   phases: ProjectPhase[];
@@ -12,6 +13,7 @@ interface CalendarViewProps {
 
 const CalendarView = ({ phases }: CalendarViewProps) => {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [holidays, setHolidays] = useState<string[]>([]);
   
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
@@ -21,26 +23,82 @@ const CalendarView = ({ phases }: CalendarViewProps) => {
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 }); // End on Saturday
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
+  // Load holidays when component mounts
+  useEffect(() => {
+    const loadHolidays = async () => {
+      try {
+        console.log('🔄 Loading holidays for calendar...');
+        const { data, error } = await supabase
+          .from('holidays')
+          .select('date');
+        
+        if (error) {
+          console.error('❌ Error loading holidays:', error);
+          return;
+        }
+        
+        const holidayDates = data.map(h => h.date);
+        setHolidays(holidayDates);
+        console.log('✅ Loaded holidays for calendar:', holidayDates);
+      } catch (error) {
+        console.error('❌ Failed to load holidays:', error);
+      }
+    };
+
+    loadHolidays();
+  }, []);
+
+  const isWorkingDay = (date: Date): boolean => {
+    const dateString = format(date, 'yyyy-MM-dd');
+    
+    // Check if it's a weekend
+    if (isWeekend(date)) {
+      return false;
+    }
+    
+    // Check if date matches any holiday
+    const isHoliday = holidays.includes(dateString);
+    return !isHoliday;
+  };
+
   const getPhasesForDate = (date: Date) => {
+    // Only show phases on working days
+    if (!isWorkingDay(date)) {
+      return [];
+    }
+
     return phases.filter(phase => {
       const phaseStart = new Date(phase.startDate);
       const phaseEnd = new Date(phase.endDate);
-      return date >= phaseStart && date <= phaseEnd;
+      
+      // Check if this date falls within the phase range AND is a working day
+      if (date >= phaseStart && date <= phaseEnd) {
+        // For multi-day phases, we need to check if this specific working day
+        // should have work scheduled on it
+        return true;
+      }
+      return false;
     });
   };
 
   const isNonWorkingDay = (date: Date) => {
     const dayOfWeek = getDay(date);
     const isWeekendDay = isWeekend(date);
+    const dateString = format(date, 'yyyy-MM-dd');
+    const isHoliday = holidays.includes(dateString);
     
-    console.log(`📅 Date: ${format(date, 'yyyy-MM-dd')} (${format(date, 'EEEE')}), Day of week: ${dayOfWeek}, isWeekend: ${isWeekendDay}`);
+    console.log(`📅 Date: ${format(date, 'yyyy-MM-dd')} (${format(date, 'EEEE')}), Day of week: ${dayOfWeek}, isWeekend: ${isWeekendDay}, isHoliday: ${isHoliday}`);
     
     // Check if it's a weekend (Saturday = 6, Sunday = 0)
     if (isWeekendDay) {
       return { isNonWorking: true, reason: 'Weekend' };
     }
     
-    // We could add holiday checking here too, but for now just weekends
+    // Check if it's a holiday
+    if (isHoliday) {
+      return { isNonWorking: true, reason: 'Holiday' };
+    }
+    
     return { isNonWorking: false };
   };
 
@@ -58,6 +116,8 @@ const CalendarView = ({ phases }: CalendarViewProps) => {
       classes += "bg-card ";
     }
     
+    // Only show conflict if there are phases scheduled on a non-working day
+    // (This should not happen with the new logic, but kept for safety)
     if (dayPhases.length > 0 && nonWorkingInfo.isNonWorking) {
       classes += "border-red-300 border-2 "; // Highlight scheduling conflicts
     }
@@ -152,9 +212,10 @@ const CalendarView = ({ phases }: CalendarViewProps) => {
           <div className="flex items-start gap-2">
             <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5" />
             <div className="text-sm">
-              <div className="font-medium text-yellow-800">Scheduling Conflicts</div>
+              <div className="font-medium text-yellow-800">Scheduling Information</div>
               <div className="text-yellow-700">
-                Red borders indicate work scheduled on weekends or holidays. Use the "Recalculate Dates" button to fix these issues.
+                Work is only scheduled on business days (Monday-Friday, excluding holidays). 
+                Use the "Recalculate Dates" button to ensure all projects follow this rule.
               </div>
             </div>
           </div>

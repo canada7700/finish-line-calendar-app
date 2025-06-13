@@ -1,6 +1,6 @@
 
 import { Project, ProjectPhase } from '../types/project';
-import { addDays, subDays, format, isWeekend, parseISO } from 'date-fns';
+import { addDays, subDays, format, isWeekend, parseISO, eachDayOfInterval } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 
 export class ProjectScheduler {
@@ -186,6 +186,12 @@ export class ProjectScheduler {
       return { shopHours: this.DEFAULT_HOURS_PER_DAY, stainHours: 6 };
     }
   }
+
+  // Get all working days within a date range
+  static getWorkingDaysInRange(startDate: Date, endDate: Date): Date[] {
+    const allDays = eachDayOfInterval({ start: startDate, end: endDate });
+    return allDays.filter(day => this.isWorkingDay(day));
+  }
   
   static async calculateProjectDates(project: Project): Promise<Project> {
     console.log('🎯 Starting project date calculation for:', project.jobName);
@@ -251,65 +257,83 @@ export class ProjectScheduler {
     const calculatedProject = await this.calculateProjectDates(project);
     const { shopHours, stainHours } = await this.getWorkingHours();
     
-    // Shop phase
+    // Shop phase - only create phases for actual working days
     if (calculatedProject.shopStartDate) {
       const shopDuration = Math.ceil(project.shopHrs / shopHours);
       const shopStartDate = new Date(calculatedProject.shopStartDate);
       const shopEndDate = this.addBusinessDays(shopStartDate, shopDuration - 1);
       
-      console.log(`🔨 Shop phase: ${calculatedProject.shopStartDate} to ${format(shopEndDate, 'yyyy-MM-dd')} (${shopDuration} days)`);
+      console.log(`🔨 Shop phase: ${calculatedProject.shopStartDate} to ${format(shopEndDate, 'yyyy-MM-dd')} (${shopDuration} working days)`);
       
-      phases.push({
-        id: `${project.id}-shop`,
-        projectId: project.id,
-        projectName: project.jobName,
-        phase: 'shop',
-        startDate: calculatedProject.shopStartDate,
-        endDate: format(shopEndDate, 'yyyy-MM-dd'),
-        hours: project.shopHrs,
-        color: 'bg-blue-500'
+      // Create individual phase entries for each working day
+      const workingDays = this.getWorkingDaysInRange(shopStartDate, shopEndDate);
+      const hoursPerDay = Math.ceil(project.shopHrs / workingDays.length);
+      
+      workingDays.forEach((workDay, index) => {
+        phases.push({
+          id: `${project.id}-shop-${index}`,
+          projectId: project.id,
+          projectName: project.jobName,
+          phase: 'shop',
+          startDate: format(workDay, 'yyyy-MM-dd'),
+          endDate: format(workDay, 'yyyy-MM-dd'), // Single day phase
+          hours: hoursPerDay,
+          color: 'bg-blue-500'
+        });
       });
     }
     
-    // Stain phase
+    // Stain phase - only create phases for actual working days
     if (calculatedProject.stainStartDate) {
       const stainDuration = Math.ceil(project.stainHrs / stainHours);
       const stainStartDate = new Date(calculatedProject.stainStartDate);
       const stainEndDate = this.addBusinessDays(stainStartDate, stainDuration - 1);
       
-      console.log(`🎨 Stain phase: ${calculatedProject.stainStartDate} to ${format(stainEndDate, 'yyyy-MM-dd')} (${stainDuration} days)`);
+      console.log(`🎨 Stain phase: ${calculatedProject.stainStartDate} to ${format(stainEndDate, 'yyyy-MM-dd')} (${stainDuration} working days)`);
       
-      phases.push({
-        id: `${project.id}-stain`,
-        projectId: project.id,
-        projectName: project.jobName,
-        phase: 'stain',
-        startDate: calculatedProject.stainStartDate,
-        endDate: format(stainEndDate, 'yyyy-MM-dd'),
-        hours: project.stainHrs,
-        color: 'bg-amber-500'
+      // Create individual phase entries for each working day
+      const workingDays = this.getWorkingDaysInRange(stainStartDate, stainEndDate);
+      const hoursPerDay = Math.ceil(project.stainHrs / workingDays.length);
+      
+      workingDays.forEach((workDay, index) => {
+        phases.push({
+          id: `${project.id}-stain-${index}`,
+          projectId: project.id,
+          projectName: project.jobName,
+          phase: 'stain',
+          startDate: format(workDay, 'yyyy-MM-dd'),
+          endDate: format(workDay, 'yyyy-MM-dd'), // Single day phase
+          hours: hoursPerDay,
+          color: 'bg-amber-500'
+        });
       });
     }
     
-    // Install phase
+    // Install phase - only create phases for actual working days
     const installDuration = Math.ceil(project.installHrs / shopHours);
     const installStartDate = new Date(calculatedProject.installDate);
     const installEndDate = this.addBusinessDays(installStartDate, installDuration - 1);
     
-    console.log(`🔧 Install phase: ${calculatedProject.installDate} to ${format(installEndDate, 'yyyy-MM-dd')} (${installDuration} days)`);
+    console.log(`🔧 Install phase: ${calculatedProject.installDate} to ${format(installEndDate, 'yyyy-MM-dd')} (${installDuration} working days)`);
     
-    phases.push({
-      id: `${project.id}-install`,
-      projectId: project.id,
-      projectName: project.jobName,
-      phase: 'install',
-      startDate: calculatedProject.installDate,
-      endDate: format(installEndDate, 'yyyy-MM-dd'),
-      hours: project.installHrs,
-      color: 'bg-green-500'
+    // Create individual phase entries for each working day
+    const workingDays = this.getWorkingDaysInRange(installStartDate, installEndDate);
+    const hoursPerDay = Math.ceil(project.installHrs / workingDays.length);
+    
+    workingDays.forEach((workDay, index) => {
+      phases.push({
+        id: `${project.id}-install-${index}`,
+        projectId: project.id,
+        projectName: project.jobName,
+        phase: 'install',
+        startDate: format(workDay, 'yyyy-MM-dd'),
+        endDate: format(workDay, 'yyyy-MM-dd'), // Single day phase
+        hours: hoursPerDay,
+        color: 'bg-green-500'
+      });
     });
     
-    console.log('✅ Generated project phases:', phases.length);
+    console.log('✅ Generated project phases (working days only):', phases.length);
     return phases;
   }
   
