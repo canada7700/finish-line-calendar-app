@@ -11,7 +11,7 @@ export class ProjectScheduler {
   // Load holidays from database
   static async loadHolidays() {
     if (this.holidaysLoaded) {
-      console.log('Holidays already loaded, skipping reload');
+      console.log('✅ Holidays already loaded, skipping reload');
       return; // Already loaded, avoid duplicate requests
     }
     
@@ -250,90 +250,108 @@ export class ProjectScheduler {
   static async generateProjectPhases(project: Project): Promise<ProjectPhase[]> {
     console.log('🎭 Generating project phases for:', project.jobName);
     
-    // Ensure holidays are loaded - CRITICAL
+    // Ensure holidays are loaded FIRST - CRITICAL
     await this.loadHolidays();
     
     const phases: ProjectPhase[] = [];
     const calculatedProject = await this.calculateProjectDates(project);
     const { shopHours, stainHours } = await this.getWorkingHours();
     
-    // Shop phase - only create phases for actual working days
+    // Shop phase - create individual phases for each working day
     if (calculatedProject.shopStartDate) {
-      const shopDuration = Math.ceil(project.shopHrs / shopHours);
       const shopStartDate = new Date(calculatedProject.shopStartDate);
-      const shopEndDate = this.addBusinessDays(shopStartDate, shopDuration - 1);
+      const shopDuration = Math.ceil(project.shopHrs / shopHours);
       
-      console.log(`🔨 Shop phase: ${calculatedProject.shopStartDate} to ${format(shopEndDate, 'yyyy-MM-dd')} (${shopDuration} working days)`);
+      console.log(`🔨 Generating shop phases for ${shopDuration} working days starting ${format(shopStartDate, 'yyyy-MM-dd')}`);
       
-      // Create individual phase entries for each working day
-      const workingDays = this.getWorkingDaysInRange(shopStartDate, shopEndDate);
-      const hoursPerDay = Math.ceil(project.shopHrs / workingDays.length);
+      let currentDate = new Date(shopStartDate);
+      const hoursPerDay = Math.ceil(project.shopHrs / shopDuration);
       
-      workingDays.forEach((workDay, index) => {
+      for (let day = 0; day < shopDuration; day++) {
+        // Find the next working day
+        while (!this.isWorkingDay(currentDate)) {
+          currentDate = addDays(currentDate, 1);
+        }
+        
         phases.push({
-          id: `${project.id}-shop-${index}`,
+          id: `${project.id}-shop-${day}`,
           projectId: project.id,
           projectName: project.jobName,
           phase: 'shop',
-          startDate: format(workDay, 'yyyy-MM-dd'),
-          endDate: format(workDay, 'yyyy-MM-dd'), // Single day phase
+          startDate: format(currentDate, 'yyyy-MM-dd'),
+          endDate: format(currentDate, 'yyyy-MM-dd'), // Single day phase
           hours: hoursPerDay,
           color: 'bg-blue-500'
         });
-      });
+        
+        console.log(`✅ Created shop phase for ${format(currentDate, 'yyyy-MM-dd')}`);
+        currentDate = addDays(currentDate, 1);
+      }
     }
     
-    // Stain phase - only create phases for actual working days
+    // Stain phase - create individual phases for each working day
     if (calculatedProject.stainStartDate) {
-      const stainDuration = Math.ceil(project.stainHrs / stainHours);
       const stainStartDate = new Date(calculatedProject.stainStartDate);
-      const stainEndDate = this.addBusinessDays(stainStartDate, stainDuration - 1);
+      const stainDuration = Math.ceil(project.stainHrs / stainHours);
       
-      console.log(`🎨 Stain phase: ${calculatedProject.stainStartDate} to ${format(stainEndDate, 'yyyy-MM-dd')} (${stainDuration} working days)`);
+      console.log(`🎨 Generating stain phases for ${stainDuration} working days starting ${format(stainStartDate, 'yyyy-MM-dd')}`);
       
-      // Create individual phase entries for each working day
-      const workingDays = this.getWorkingDaysInRange(stainStartDate, stainEndDate);
-      const hoursPerDay = Math.ceil(project.stainHrs / workingDays.length);
+      let currentDate = new Date(stainStartDate);
+      const hoursPerDay = Math.ceil(project.stainHrs / stainDuration);
       
-      workingDays.forEach((workDay, index) => {
+      for (let day = 0; day < stainDuration; day++) {
+        // Find the next working day
+        while (!this.isWorkingDay(currentDate)) {
+          currentDate = addDays(currentDate, 1);
+        }
+        
         phases.push({
-          id: `${project.id}-stain-${index}`,
+          id: `${project.id}-stain-${day}`,
           projectId: project.id,
           projectName: project.jobName,
           phase: 'stain',
-          startDate: format(workDay, 'yyyy-MM-dd'),
-          endDate: format(workDay, 'yyyy-MM-dd'), // Single day phase
+          startDate: format(currentDate, 'yyyy-MM-dd'),
+          endDate: format(currentDate, 'yyyy-MM-dd'), // Single day phase
           hours: hoursPerDay,
           color: 'bg-amber-500'
         });
-      });
+        
+        console.log(`✅ Created stain phase for ${format(currentDate, 'yyyy-MM-dd')}`);
+        currentDate = addDays(currentDate, 1);
+      }
     }
     
-    // Install phase - only create phases for actual working days
-    const installDuration = Math.ceil(project.installHrs / shopHours);
+    // Install phase - create individual phases for each working day
     const installStartDate = new Date(calculatedProject.installDate);
-    const installEndDate = this.addBusinessDays(installStartDate, installDuration - 1);
+    const installDuration = Math.ceil(project.installHrs / shopHours);
     
-    console.log(`🔧 Install phase: ${calculatedProject.installDate} to ${format(installEndDate, 'yyyy-MM-dd')} (${installDuration} working days)`);
+    console.log(`🔧 Generating install phases for ${installDuration} working days starting ${format(installStartDate, 'yyyy-MM-dd')}`);
     
-    // Create individual phase entries for each working day
-    const workingDays = this.getWorkingDaysInRange(installStartDate, installEndDate);
-    const hoursPerDay = Math.ceil(project.installHrs / workingDays.length);
+    let currentDate = new Date(installStartDate);
+    const hoursPerDay = Math.ceil(project.installHrs / installDuration);
     
-    workingDays.forEach((workDay, index) => {
+    for (let day = 0; day < installDuration; day++) {
+      // Find the next working day
+      while (!this.isWorkingDay(currentDate)) {
+        currentDate = addDays(currentDate, 1);
+      }
+      
       phases.push({
-        id: `${project.id}-install-${index}`,
+        id: `${project.id}-install-${day}`,
         projectId: project.id,
         projectName: project.jobName,
         phase: 'install',
-        startDate: format(workDay, 'yyyy-MM-dd'),
-        endDate: format(workDay, 'yyyy-MM-dd'), // Single day phase
+        startDate: format(currentDate, 'yyyy-MM-dd'),
+        endDate: format(currentDate, 'yyyy-MM-dd'), // Single day phase
         hours: hoursPerDay,
         color: 'bg-green-500'
       });
-    });
+      
+      console.log(`✅ Created install phase for ${format(currentDate, 'yyyy-MM-dd')}`);
+      currentDate = addDays(currentDate, 1);
+    }
     
-    console.log('✅ Generated project phases (working days only):', phases.length);
+    console.log(`✅ Generated ${phases.length} project phases (working days only)`);
     return phases;
   }
   

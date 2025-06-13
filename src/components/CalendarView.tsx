@@ -4,7 +4,7 @@ import { ProjectPhase } from '../types/project';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isWeekend, getDay, startOfWeek, endOfWeek, parseISO, eachWeekendOfInterval } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isWeekend, getDay, startOfWeek, endOfWeek } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 
 interface CalendarViewProps {
@@ -14,6 +14,7 @@ interface CalendarViewProps {
 const CalendarView = ({ phases }: CalendarViewProps) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [holidays, setHolidays] = useState<string[]>([]);
+  const [holidaysLoaded, setHolidaysLoaded] = useState(false);
   
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
@@ -27,21 +28,22 @@ const CalendarView = ({ phases }: CalendarViewProps) => {
   useEffect(() => {
     const loadHolidays = async () => {
       try {
-        console.log('🔄 Loading holidays for calendar...');
+        console.log('🔄 CalendarView: Loading holidays...');
         const { data, error } = await supabase
           .from('holidays')
           .select('date');
         
         if (error) {
-          console.error('❌ Error loading holidays:', error);
+          console.error('❌ CalendarView: Error loading holidays:', error);
           return;
         }
         
         const holidayDates = data.map(h => h.date);
         setHolidays(holidayDates);
-        console.log('✅ Loaded holidays for calendar:', holidayDates);
+        setHolidaysLoaded(true);
+        console.log('✅ CalendarView: Loaded holidays:', holidayDates);
       } catch (error) {
-        console.error('❌ Failed to load holidays:', error);
+        console.error('❌ CalendarView: Failed to load holidays:', error);
       }
     };
 
@@ -62,23 +64,22 @@ const CalendarView = ({ phases }: CalendarViewProps) => {
   };
 
   const getPhasesForDate = (date: Date) => {
-    // Only show phases on working days
-    if (!isWorkingDay(date)) {
-      return [];
-    }
-
-    return phases.filter(phase => {
-      const phaseStart = new Date(phase.startDate);
-      const phaseEnd = new Date(phase.endDate);
-      
-      // Check if this date falls within the phase range AND is a working day
-      if (date >= phaseStart && date <= phaseEnd) {
-        // For multi-day phases, we need to check if this specific working day
-        // should have work scheduled on it
-        return true;
-      }
-      return false;
+    const dateString = format(date, 'yyyy-MM-dd');
+    
+    // Get all phases that match this exact date
+    const dayPhases = phases.filter(phase => {
+      const phaseMatches = phase.startDate === dateString && phase.endDate === dateString;
+      return phaseMatches;
     });
+    
+    // Debug logging
+    if (dayPhases.length > 0) {
+      console.log(`📅 CalendarView: Found ${dayPhases.length} phases for ${dateString}:`, dayPhases.map(p => `${p.projectName}-${p.phase}`));
+    }
+    
+    // Only show phases on working days - but don't filter here, let the visual display handle it
+    // This way we can see scheduling conflicts if they exist
+    return dayPhases;
   };
 
   const isNonWorkingDay = (date: Date) => {
@@ -86,8 +87,6 @@ const CalendarView = ({ phases }: CalendarViewProps) => {
     const isWeekendDay = isWeekend(date);
     const dateString = format(date, 'yyyy-MM-dd');
     const isHoliday = holidays.includes(dateString);
-    
-    console.log(`📅 Date: ${format(date, 'yyyy-MM-dd')} (${format(date, 'EEEE')}), Day of week: ${dayOfWeek}, isWeekend: ${isWeekendDay}, isHoliday: ${isHoliday}`);
     
     // Check if it's a weekend (Saturday = 6, Sunday = 0)
     if (isWeekendDay) {
@@ -116,14 +115,27 @@ const CalendarView = ({ phases }: CalendarViewProps) => {
       classes += "bg-card ";
     }
     
-    // Only show conflict if there are phases scheduled on a non-working day
-    // (This should not happen with the new logic, but kept for safety)
+    // Highlight scheduling conflicts (phases on non-working days)
     if (dayPhases.length > 0 && nonWorkingInfo.isNonWorking) {
       classes += "border-red-300 border-2 "; // Highlight scheduling conflicts
+      console.warn(`⚠️ CalendarView: Scheduling conflict on ${format(date, 'yyyy-MM-dd')} (${nonWorkingInfo.reason}):`, dayPhases);
     }
     
     return classes;
   };
+
+  // Debug logging for phases
+  useEffect(() => {
+    console.log(`🔍 CalendarView: Received ${phases.length} phases total`);
+    if (phases.length > 0) {
+      console.log('📋 CalendarView: Phase summary:', phases.map(p => `${p.projectName}-${p.phase} on ${p.startDate}`));
+    }
+  }, [phases]);
+
+  // Debug logging for holidays loading
+  useEffect(() => {
+    console.log(`🎄 CalendarView: Holidays loaded: ${holidaysLoaded}, count: ${holidays.length}`);
+  }, [holidays, holidaysLoaded]);
 
   return (
     <Card>
@@ -149,6 +161,13 @@ const CalendarView = ({ phases }: CalendarViewProps) => {
         </div>
       </CardHeader>
       <CardContent>
+        {/* Debug info */}
+        {!holidaysLoaded && (
+          <div className="mb-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm">
+            ⏳ Loading holidays... ({holidays.length} loaded so far)
+          </div>
+        )}
+        
         <div className="grid grid-cols-7 gap-1 mb-4">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
             <div key={day} className="p-2 text-center font-medium text-muted-foreground text-sm">
@@ -217,6 +236,11 @@ const CalendarView = ({ phases }: CalendarViewProps) => {
                 Work is only scheduled on business days (Monday-Friday, excluding holidays). 
                 Use the "Recalculate Dates" button to ensure all projects follow this rule.
               </div>
+              {phases.length === 0 && (
+                <div className="text-yellow-700 mt-1">
+                  <strong>No phases found.</strong> Check console for debugging information.
+                </div>
+              )}
             </div>
           </div>
         </div>
