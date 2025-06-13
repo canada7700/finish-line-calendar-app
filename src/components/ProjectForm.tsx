@@ -7,9 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon } from 'lucide-react';
-import { format } from 'date-fns';
+import { CalendarIcon, AlertTriangle } from 'lucide-react';
+import { format, isWeekend } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { ProjectScheduler } from '../utils/projectScheduler';
 
 interface ProjectFormProps {
   onSubmit: (project: Omit<Project, 'id'>) => void;
@@ -28,6 +29,27 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false }: ProjectFormPr
   });
 
   const [installDate, setInstallDate] = useState<Date>();
+  const [dateWarning, setDateWarning] = useState<string>('');
+
+  const handleInstallDateSelect = async (date: Date | undefined) => {
+    setInstallDate(date);
+    setDateWarning('');
+    
+    if (date) {
+      // Load holidays first
+      await ProjectScheduler.loadHolidays();
+      
+      // Validate the selected date
+      const validation = ProjectScheduler.validateWorkingDay(date);
+      
+      if (!validation.isValid && validation.suggestedDate) {
+        const reason = isWeekend(date) ? 'weekend' : 'holiday';
+        setDateWarning(
+          `Selected date is a ${reason}. Consider ${format(validation.suggestedDate, 'MMMM do, yyyy')} instead.`
+        );
+      }
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -144,12 +166,19 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false }: ProjectFormPr
                 <Calendar
                   mode="single"
                   selected={installDate}
-                  onSelect={setInstallDate}
+                  onSelect={handleInstallDateSelect}
                   initialFocus
                   className="p-3 pointer-events-auto"
                 />
               </PopoverContent>
             </Popover>
+            
+            {dateWarning && (
+              <div className="flex items-center gap-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+                <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                <span className="text-sm text-yellow-800">{dateWarning}</span>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-3 pt-4">

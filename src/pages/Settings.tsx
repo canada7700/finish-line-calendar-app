@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,7 +25,10 @@ const Settings = () => {
   const handleAddHoliday = (e: React.FormEvent) => {
     e.preventDefault();
     if (holidayName.trim() && holidayDate) {
-      addHoliday({ name: holidayName.trim(), date: holidayDate });
+      // Ensure the date is stored exactly as entered without timezone conversion
+      const dateValue = holidayDate; // Keep the YYYY-MM-DD format as is
+      console.log('Adding holiday with date:', dateValue);
+      addHoliday({ name: holidayName.trim(), date: dateValue });
       setHolidayName('');
       setHolidayDate('');
     }
@@ -37,7 +41,10 @@ const Settings = () => {
 
   const formatHolidayDate = (dateString: string) => {
     try {
-      return format(new Date(dateString), 'MMMM do, yyyy');
+      // Create date object from YYYY-MM-DD string without timezone conversion
+      const [year, month, day] = dateString.split('-').map(Number);
+      const date = new Date(year, month - 1, day);
+      return format(date, 'MMMM do, yyyy');
     } catch {
       return dateString;
     }
