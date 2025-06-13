@@ -15,10 +15,10 @@ const Dashboard = () => {
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState('projects');
 
-  const handleAddProject = (projectData: Omit<Project, 'id'>) => {
+  const handleAddProject = async (projectData: Omit<Project, 'id'>) => {
     // Create a temporary project with an id for calculation purposes
     const tempProject = { ...projectData, id: 'temp' };
-    const calculatedProject = ProjectScheduler.calculateProjectDates(tempProject);
+    const calculatedProject = await ProjectScheduler.calculateProjectDates(tempProject);
     console.log('Submitting project with calculated dates:', calculatedProject);
     // Remove the temporary id since addProject expects Omit<Project, 'id'>
     const { id, ...projectWithoutId } = calculatedProject;
