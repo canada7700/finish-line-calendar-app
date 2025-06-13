@@ -12,7 +12,7 @@ import { Plus, Calendar, LayoutGrid, List } from 'lucide-react';
 import { useProjects } from '../hooks/useProjects';
 
 const Dashboard = () => {
-  const { projects, isLoading, addProject, isAddingProject } = useProjects();
+  const { projects, isLoading, addProject, isAddingProject, deleteProject } = useProjects();
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState('projects');
   const [allPhases, setAllPhases] = useState<ProjectPhase[]>([]);
@@ -163,6 +163,7 @@ const Dashboard = () => {
                     key={project.id}
                     project={project}
                     onClick={() => console.log('Project clicked:', project.id)}
+                    onDelete={deleteProject}
                   />
                 ))}
               </div>
@@ -170,7 +171,7 @@ const Dashboard = () => {
           </TabsContent>
 
           <TabsContent value="list" className="space-y-6">
-            <ProjectListView projects={projects} />
+            <ProjectListView projects={projects} onDelete={deleteProject} />
           </TabsContent>
 
           <TabsContent value="calendar" className="space-y-6">

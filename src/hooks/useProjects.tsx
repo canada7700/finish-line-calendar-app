@@ -94,11 +94,46 @@ export const useProjects = () => {
     }
   });
 
+  // Delete project mutation
+  const deleteProjectMutation = useMutation({
+    mutationFn: async (projectId: string) => {
+      console.log('Deleting project:', projectId);
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', projectId);
+
+      if (error) {
+        console.error('Error deleting project:', error);
+        throw error;
+      }
+
+      console.log('Project deleted successfully');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      toast({
+        title: "Project Deleted",
+        description: "Project has been deleted successfully.",
+      });
+    },
+    onError: (error) => {
+      console.error('Failed to delete project:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete project. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
   return {
     projects,
     isLoading,
     error,
     addProject: addProjectMutation.mutate,
-    isAddingProject: addProjectMutation.isPending
+    isAddingProject: addProjectMutation.isPending,
+    deleteProject: deleteProjectMutation.mutate,
+    isDeletingProject: deleteProjectMutation.isPending
   };
 };

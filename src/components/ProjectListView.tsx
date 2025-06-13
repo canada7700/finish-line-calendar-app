@@ -11,16 +11,17 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowUpDown } from 'lucide-react';
+import { ArrowUpDown, Trash2 } from 'lucide-react';
 
 interface ProjectListViewProps {
   projects: Project[];
+  onDelete?: (projectId: string) => void;
 }
 
 type SortField = 'jobName' | 'installDate' | 'totalHours' | 'status';
 type SortDirection = 'asc' | 'desc';
 
-const ProjectListView = ({ projects }: ProjectListViewProps) => {
+const ProjectListView = ({ projects, onDelete }: ProjectListViewProps) => {
   const [sortField, setSortField] = useState<SortField>('installDate');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
@@ -30,6 +31,12 @@ const ProjectListView = ({ projects }: ProjectListViewProps) => {
     } else {
       setSortField(field);
       setSortDirection('asc');
+    }
+  };
+
+  const handleDelete = (projectId: string) => {
+    if (onDelete && confirm('Are you sure you want to delete this project?')) {
+      onDelete(projectId);
     }
   };
 
@@ -137,6 +144,7 @@ const ProjectListView = ({ projects }: ProjectListViewProps) => {
             <TableHead>Shop Hours</TableHead>
             <TableHead>Stain Hours</TableHead>
             <TableHead>Install Hours</TableHead>
+            <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -156,6 +164,16 @@ const ProjectListView = ({ projects }: ProjectListViewProps) => {
               <TableCell>{project.shopHrs}</TableCell>
               <TableCell>{project.stainHrs}</TableCell>
               <TableCell>{project.installHrs}</TableCell>
+              <TableCell>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-red-50"
+                  onClick={() => handleDelete(project.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>

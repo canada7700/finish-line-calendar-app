@@ -2,15 +2,17 @@
 import { Project } from '../types/project';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, Hammer, Paintbrush, Wrench } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Calendar, Clock, Hammer, Paintbrush, Wrench, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface ProjectCardProps {
   project: Project;
   onClick?: () => void;
+  onDelete?: (projectId: string) => void;
 }
 
-const ProjectCard = ({ project, onClick }: ProjectCardProps) => {
+const ProjectCard = ({ project, onClick, onDelete }: ProjectCardProps) => {
   const getStatusColor = (status: Project['status']) => {
     switch (status) {
       case 'planning': return 'bg-gray-500';
@@ -24,17 +26,34 @@ const ProjectCard = ({ project, onClick }: ProjectCardProps) => {
 
   const totalHours = project.shopHrs + project.stainHrs + project.installHrs;
 
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click when delete button is clicked
+    if (onDelete && confirm('Are you sure you want to delete this project?')) {
+      onDelete(project.id);
+    }
+  };
+
   return (
     <Card 
-      className="hover:shadow-lg transition-all duration-200 cursor-pointer hover:scale-[1.02]"
+      className="hover:shadow-lg transition-all duration-200 cursor-pointer hover:scale-[1.02] relative"
       onClick={onClick}
     >
       <CardHeader className="pb-3">
         <div className="flex justify-between items-start">
-          <CardTitle className="text-lg font-semibold">{project.jobName}</CardTitle>
-          <Badge className={`${getStatusColor(project.status)} text-white`}>
-            {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
-          </Badge>
+          <CardTitle className="text-lg font-semibold pr-8">{project.jobName}</CardTitle>
+          <div className="flex items-center gap-2">
+            <Badge className={`${getStatusColor(project.status)} text-white`}>
+              {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
+            </Badge>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-red-50"
+              onClick={handleDelete}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         <p className="text-sm text-gray-600">{project.jobDescription}</p>
       </CardHeader>
