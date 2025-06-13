@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +8,6 @@ import { Calendar, Clock, Trash2, Plus } from 'lucide-react';
 import { useHolidays } from '../hooks/useHolidays';
 import { useSettings } from '../hooks/useSettings';
 import { format } from 'date-fns';
-import TeamMemberManager from '../components/TeamMemberManager';
 
 const Settings = () => {
   const { holidays, addHoliday, deleteHoliday, isAddingHoliday, isDeletingHoliday } = useHolidays();
@@ -58,9 +56,6 @@ const Settings = () => {
         <Separator />
 
         <div className="grid gap-6">
-          {/* Team Management Section */}
-          <TeamMemberManager />
-
           {/* Holidays Section */}
           <Card>
             <CardHeader>

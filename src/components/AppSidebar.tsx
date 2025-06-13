@@ -1,5 +1,4 @@
-
-import { Home, Settings, Calendar, LayoutGrid } from 'lucide-react';
+import { Home, Settings, Calendar, LayoutGrid, Users } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -20,6 +19,11 @@ const menuItems = [
     title: 'Dashboard',
     url: '/',
     icon: Home,
+  },
+  {
+    title: 'Team',
+    url: '/team',
+    icon: Users,
   },
   {
     title: 'Settings',
