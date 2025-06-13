@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Project, ProjectPhase } from '../types/project';
 import { ProjectScheduler } from '../utils/projectScheduler';
@@ -17,9 +16,11 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('projects');
 
   const handleAddProject = (projectData: Omit<Project, 'id'>) => {
-    const calculatedProject = ProjectScheduler.calculateProjectDates(projectData);
+    // Create a temporary project with an id for calculation purposes
+    const tempProject = { ...projectData, id: 'temp' };
+    const calculatedProject = ProjectScheduler.calculateProjectDates(tempProject);
     console.log('Submitting project with calculated dates:', calculatedProject);
-    // Remove the id from calculatedProject since addProject expects Omit<Project, 'id'>
+    // Remove the temporary id since addProject expects Omit<Project, 'id'>
     const { id, ...projectWithoutId } = calculatedProject;
     addProject(projectWithoutId);
     setShowForm(false);
