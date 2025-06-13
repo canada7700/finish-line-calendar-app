@@ -4,7 +4,7 @@ import { ProjectPhase } from '../types/project';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, isWeekend } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, isWeekend, getDay } from 'date-fns';
 
 interface CalendarViewProps {
   phases: ProjectPhase[];
@@ -26,8 +26,14 @@ const CalendarView = ({ phases }: CalendarViewProps) => {
   };
 
   const isNonWorkingDay = (date: Date) => {
-    // Check if it's a weekend
-    if (isWeekend(date)) {
+    // Debug logging to track the issue
+    const dayOfWeek = getDay(date);
+    const isWeekendDay = isWeekend(date);
+    
+    console.log(`📅 Date: ${format(date, 'yyyy-MM-dd')} (${format(date, 'EEEE')}), Day of week: ${dayOfWeek}, isWeekend: ${isWeekendDay}`);
+    
+    // Check if it's a weekend (Saturday = 6, Sunday = 0)
+    if (isWeekendDay) {
       return { isNonWorking: true, reason: 'Weekend' };
     }
     
