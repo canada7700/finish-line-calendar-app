@@ -94,10 +94,11 @@ export class ProjectScheduler {
       const shopHoursSetting = data.find(s => s.key === 'shop_hours_per_day');
       const stainHoursSetting = data.find(s => s.key === 'stain_hours_per_day');
       
-      return {
-        shopHours: shopHoursSetting ? parseInt(shopHoursSetting.value) : this.DEFAULT_HOURS_PER_DAY,
-        stainHours: stainHoursSetting ? parseInt(stainHoursSetting.value) : 6
-      };
+      // Handle Json type properly - convert to number
+      const shopHours = shopHoursSetting ? Number(shopHoursSetting.value) : this.DEFAULT_HOURS_PER_DAY;
+      const stainHours = stainHoursSetting ? Number(stainHoursSetting.value) : 6;
+      
+      return { shopHours, stainHours };
     } catch (error) {
       console.error('Failed to load working hours:', error);
       return { shopHours: this.DEFAULT_HOURS_PER_DAY, stainHours: 6 };

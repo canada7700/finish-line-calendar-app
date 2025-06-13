@@ -1,4 +1,5 @@
-import { useState } from 'react';
+
+import { useState, useEffect } from 'react';
 import { Project, ProjectPhase } from '../types/project';
 import { ProjectScheduler } from '../utils/projectScheduler';
 import ProjectCard from './ProjectCard';
@@ -14,6 +15,25 @@ const Dashboard = () => {
   const { projects, isLoading, addProject, isAddingProject } = useProjects();
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState('projects');
+  const [allPhases, setAllPhases] = useState<ProjectPhase[]>([]);
+
+  // Generate phases asynchronously when projects change
+  useEffect(() => {
+    const generatePhases = async () => {
+      const phasePromises = projects.map(project => 
+        ProjectScheduler.generateProjectPhases(project)
+      );
+      const phasesArrays = await Promise.all(phasePromises);
+      const flattenedPhases = phasesArrays.flat();
+      setAllPhases(flattenedPhases);
+    };
+
+    if (projects.length > 0) {
+      generatePhases();
+    } else {
+      setAllPhases([]);
+    }
+  }, [projects]);
 
   const handleAddProject = async (projectData: Omit<Project, 'id'>) => {
     // Create a temporary project with an id for calculation purposes
@@ -25,10 +45,6 @@ const Dashboard = () => {
     addProject(projectWithoutId);
     setShowForm(false);
   };
-
-  const allPhases: ProjectPhase[] = projects.flatMap(project =>
-    ProjectScheduler.generateProjectPhases(project)
-  );
 
   const getStatusCounts = () => {
     const counts = {
