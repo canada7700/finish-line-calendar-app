@@ -16,9 +16,14 @@ import { Link, useLocation } from 'react-router-dom';
 
 const menuItems = [
   {
-    title: 'Dashboard',
-    url: '/',
-    icon: Home,
+    title: 'Projects',
+    url: '/projects',
+    icon: LayoutGrid,
+  },
+  {
+    title: 'Calendar',
+    url: '/calendar',
+    icon: Calendar,
   },
   {
     title: 'Team',
@@ -50,7 +55,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location.pathname === item.url}>
+                  <SidebarMenuButton asChild isActive={location.pathname === item.url || (item.url === '/projects' && location.pathname === '/')}>
                     <Link to={item.url}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
