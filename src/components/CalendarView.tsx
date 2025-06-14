@@ -1,7 +1,6 @@
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ProjectPhase } from '../types/project';
-import { addMonths, subMonths } from 'date-fns';
+import { addMonths, subMonths, isSameMonth } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import MonthView from "./MonthView";
@@ -21,6 +20,8 @@ export const CalendarView = ({ phases }: CalendarViewProps) => {
   const bottomSentinelRef = useRef<HTMLDivElement>(null);
   
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const currentMonthRef = useRef<HTMLDivElement>(null);
+  const hasScrolledToCurrentMonth = useRef(false);
 
   useEffect(() => {
     const loadHolidays = async () => {
@@ -73,6 +74,12 @@ export const CalendarView = ({ phases }: CalendarViewProps) => {
     return () => currentObserver.disconnect();
   }, [loadPrevious, loadNext]);
 
+  useEffect(() => {
+    if (holidaysLoaded && currentMonthRef.current && !hasScrolledToCurrentMonth.current) {
+        currentMonthRef.current.scrollIntoView({ block: 'start' });
+        hasScrolledToCurrentMonth.current = true;
+    }
+  }, [holidaysLoaded, monthsToRender]);
 
   return (
     <ScrollArea className="h-full p-4 md:p-6" ref={scrollContainerRef}>
@@ -90,9 +97,14 @@ export const CalendarView = ({ phases }: CalendarViewProps) => {
       <div ref={topSentinelRef} className="h-1" />
       
       {holidaysLoaded ? (
-        monthsToRender.map(month => (
-          <MonthView key={month.toISOString()} monthDate={month} phases={phases} holidays={holidays} />
-        ))
+        monthsToRender.map(month => {
+          const isCurrent = isSameMonth(month, new Date());
+          return (
+            <div key={month.toISOString()} ref={isCurrent ? currentMonthRef : null}>
+              <MonthView monthDate={month} phases={phases} holidays={holidays} />
+            </div>
+          );
+        })
       ) : (
         <div className="flex justify-center items-center h-64">
           <Loader2 className="h-8 w-8 animate-spin" />
