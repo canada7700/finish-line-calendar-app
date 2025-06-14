@@ -1,4 +1,3 @@
-
 import { Project, ProjectPhase } from '../types/project';
 import { addDays, subDays, format, isWeekend, parseISO, eachDayOfInterval } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -214,6 +213,9 @@ export class ProjectScheduler {
       finalInstallDate = installValidation.suggestedDate!;
     }
     
+    // Material order date is 60 calendar days before install
+    const materialOrderDate = subDays(finalInstallDate, 60);
+
     // Calculate duration in business days
     const installDuration = Math.ceil(project.installHrs / shopHours);
     const stainDuration = Math.ceil(project.stainHrs / stainHours);
@@ -234,7 +236,8 @@ export class ProjectScheduler {
       shopEnd: format(shopEndDate, 'yyyy-MM-dd'),
       stainStart: format(stainStartDate, 'yyyy-MM-dd'),
       stainEnd: format(stainEndDate, 'yyyy-MM-dd'),
-      install: format(finalInstallDate, 'yyyy-MM-dd')
+      install: format(finalInstallDate, 'yyyy-MM-dd'),
+      materialOrder: format(materialOrderDate, 'yyyy-MM-dd'),
     };
     
     console.log('✅ Calculated project dates:', calculatedDates);
@@ -242,6 +245,7 @@ export class ProjectScheduler {
     return {
       ...project,
       installDate: calculatedDates.install, // Update install date if it was adjusted
+      materialOrderDate: calculatedDates.materialOrder,
       shopStartDate: calculatedDates.shopStart,
       stainStartDate: calculatedDates.stainStart,
       stainLacquerDate: calculatedDates.stainEnd,
@@ -258,6 +262,21 @@ export class ProjectScheduler {
     const calculatedProject = await this.calculateProjectDates(project);
     const { shopHours, stainHours } = await this.getWorkingHours();
     
+    // Material Order phase
+    if (calculatedProject.materialOrderDate) {
+      phases.push({
+        id: `${project.id}-material-order`,
+        projectId: project.id,
+        projectName: `${project.jobName} Material Order Date`,
+        phase: 'materialOrder',
+        startDate: calculatedProject.materialOrderDate,
+        endDate: calculatedProject.materialOrderDate,
+        hours: 0,
+        color: 'bg-red-600',
+      });
+      console.log(`✅ Created material order phase for ${calculatedProject.materialOrderDate}`);
+    }
+
     // Shop phase - create individual phases for each working day
     if (calculatedProject.shopStartDate) {
       // Parse as local time to avoid timezone shift

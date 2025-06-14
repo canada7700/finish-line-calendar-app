@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Project } from '../types/project';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon, AlertTriangle } from 'lucide-react';
-import { format, isWeekend } from 'date-fns';
+import { format, isWeekend, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ProjectScheduler } from '../utils/projectScheduler';
 
@@ -31,6 +30,7 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false, projectToEdit =
   });
 
   const [installDate, setInstallDate] = useState<Date>();
+  const [materialOrderDate, setMaterialOrderDate] = useState<Date | null>(null);
   const [dateWarning, setDateWarning] = useState<string>('');
 
   useEffect(() => {
@@ -45,7 +45,9 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false, projectToEdit =
       if (projectToEdit.installDate) {
         // By appending 'T00:00:00', we tell the Date constructor to parse the date
         // in the local timezone, which prevents it from shifting to the previous day.
-        setInstallDate(new Date(`${projectToEdit.installDate}T00:00:00`));
+        const installD = new Date(`${projectToEdit.installDate}T00:00:00`);
+        setInstallDate(installD);
+        setMaterialOrderDate(subDays(installD, 60));
       }
       setDateWarning('');
     } else {
@@ -58,12 +60,18 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false, projectToEdit =
         installHrs: 0,
       });
       setInstallDate(undefined);
+      setMaterialOrderDate(null);
       setDateWarning('');
     }
   }, [projectToEdit, isEditing]);
 
   const handleInstallDateSelect = async (date: Date | undefined) => {
     setInstallDate(date);
+    if (date) {
+      setMaterialOrderDate(subDays(date, 60));
+    } else {
+      setMaterialOrderDate(null);
+    }
     setDateWarning('');
     
     if (date) {
@@ -112,11 +120,8 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false, projectToEdit =
   };
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
-      <CardHeader>
-        <CardTitle>{isEditing ? 'Edit Project' : 'Add New Project'}</CardTitle>
-      </CardHeader>
-      <CardContent>
+    <Card className="w-full max-w-2xl mx-auto border-0 shadow-none">
+      <CardContent className="pt-4 px-1">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -213,6 +218,15 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false, projectToEdit =
               <div className="flex items-center gap-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
                 <AlertTriangle className="h-4 w-4 text-yellow-600" />
                 <span className="text-sm text-yellow-800">{dateWarning}</span>
+              </div>
+            )}
+            
+            {materialOrderDate && (
+              <div className="p-3 bg-red-100 border border-red-200 rounded-md mt-2">
+                <p className="text-sm font-semibold text-red-700 text-center">
+                  {formData.jobName ? `${formData.jobName} Material Order Date: ` : 'Material Order Date: '}
+                  {format(materialOrderDate, 'PPP')}
+                </p>
               </div>
             )}
           </div>

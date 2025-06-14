@@ -20,7 +20,7 @@ export interface ProjectPhase {
   id: string;
   projectId: string;
   projectName: string;
-  phase: 'shop' | 'stain' | 'install';
+  phase: 'shop' | 'stain' | 'install' | 'materialOrder';
   startDate: string;
   endDate: string;
   hours: number;
