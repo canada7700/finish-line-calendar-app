@@ -1,10 +1,12 @@
+
 import { useMemo, useState } from 'react';
-import { ProjectPhase, ProjectNote } from '../types/project';
+import { ProjectPhase, ProjectNote, DailyNote } from '../types/project';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, startOfWeek, endOfWeek } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertTriangle, MessageSquare } from 'lucide-react';
 import { Holiday } from '@/hooks/useHolidays';
 import { useProjectNotes } from '@/hooks/useProjectNotes';
+import { useDailyNotes } from '@/hooks/useDailyNotes';
 import DayDialog from './DayDialog';
 
 interface MonthViewProps {
@@ -19,16 +21,17 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
   const monthStart = startOfMonth(monthDate);
   const monthEnd = endOfMonth(monthDate);
   
-  const { data: notes = [], refetch: refetchNotes } = useProjectNotes(monthStart, monthEnd);
+  const { data: projectNotes = [], refetch: refetchProjectNotes } = useProjectNotes(monthStart, monthEnd);
+  const { data: dailyNotes = [], refetch: refetchDailyNotes } = useDailyNotes(monthStart, monthEnd);
 
   const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
   
   const holidaysMap = useMemo(() => new Map(holidays.map(h => [h.date, h.name])), [holidays]);
-  const notesByDate = useMemo(() => {
+  const projectNotesByDate = useMemo(() => {
     const map = new Map<string, ProjectNote[]>();
-    notes.forEach(note => {
+    projectNotes.forEach(note => {
       const dateKey = note.date;
       if (!map.has(dateKey)) {
         map.set(dateKey, []);
@@ -36,7 +39,15 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
       map.get(dateKey)!.push(note);
     });
     return map;
-  }, [notes]);
+  }, [projectNotes]);
+
+  const dailyNotesByDate = useMemo(() => {
+    const map = new Map<string, DailyNote>();
+    dailyNotes.forEach(note => {
+        map.set(note.date, note);
+    });
+    return map;
+  }, [dailyNotes]);
 
   const isNonWorkingDay = (date: Date) => {
     const isWeekendDay = isWeekend(date);
@@ -77,6 +88,11 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
   const handleDayClick = (day: Date) => {
     setDialogState({ open: true, date: day });
   };
+  
+  const handleNoteUpdate = () => {
+    refetchProjectNotes();
+    refetchDailyNotes();
+  };
 
   return (
     <>
@@ -100,7 +116,9 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
               const hasSchedulingConflict = dayPhases.length > 0 && nonWorkingInfo.isNonWorking;
               const isCurrentMonth = day >= monthStart && day <= monthEnd;
               const dateString = format(day, 'yyyy-MM-dd');
-              const dayNotes = notesByDate.get(dateString) || [];
+              const dayProjectNotes = projectNotesByDate.get(dateString) || [];
+              const dayDailyNote = dailyNotesByDate.get(dateString);
+              const hasNotes = dayProjectNotes.some(n => n.note) || (dayDailyNote && dayDailyNote.note);
               
               return (
                 <div
@@ -113,7 +131,7 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
                       {format(day, 'd')}
                     </div>
                     <div className="flex items-center gap-1">
-                      {dayNotes.length > 0 && isCurrentMonth && (
+                      {hasNotes && isCurrentMonth && (
                         <MessageSquare className="h-3 w-3 text-blue-500" />
                       )}
                       {hasSchedulingConflict && (
@@ -158,8 +176,9 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
         onOpenChange={(open) => setDialogState({ ...dialogState, open })}
         date={dialogState.date}
         phases={dialogState.date ? getPhasesForDate(dialogState.date) : []}
-        notes={dialogState.date ? notesByDate.get(format(dialogState.date, 'yyyy-MM-dd')) || [] : []}
-        onNoteUpdate={refetchNotes}
+        projectNotes={dialogState.date ? projectNotesByDate.get(format(dialogState.date, 'yyyy-MM-dd')) || [] : []}
+        dailyNote={dialogState.date ? dailyNotesByDate.get(format(dialogState.date, 'yyyy-MM-dd')) : undefined}
+        onNoteUpdate={handleNoteUpdate}
       />
     </>
   );

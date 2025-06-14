@@ -1,3 +1,4 @@
+
 export interface Project {
   id: string;
   jobName: string;
@@ -58,6 +59,14 @@ export interface ProjectAssignment {
 export interface ProjectNote {
   id: string;
   project_id: string;
+  date: string;
+  note: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DailyNote {
+  id: string;
   date: string;
   note: string;
   created_at: string;

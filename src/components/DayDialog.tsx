@@ -1,57 +1,75 @@
 
 import * as React from 'react';
-import { ProjectPhase, ProjectNote } from '../types/project';
-import { format, parseISO } from 'date-fns';
+import { ProjectPhase, ProjectNote, DailyNote } from '../types/project';
+import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { useUpsertNote } from '@/hooks/useProjectNotes';
+import { useUpsertNote as useUpsertProjectNote } from '@/hooks/useProjectNotes';
+import { useUpsertDailyNote } from '@/hooks/useDailyNotes';
 import { AlertTriangle, Trash2 } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
 
 interface DayDialogProps {
   date: Date | null;
   phases: ProjectPhase[];
-  notes: ProjectNote[];
+  projectNotes: ProjectNote[];
+  dailyNote?: DailyNote;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onNoteUpdate: () => void;
 }
 
-const DayDialog = ({ date, phases, notes, open, onOpenChange, onNoteUpdate }: DayDialogProps) => {
-  const [currentNotes, setCurrentNotes] = React.useState<Record<string, string>>({});
-  const upsertNoteMutation = useUpsertNote();
+const DayDialog = ({ date, phases, projectNotes, dailyNote, open, onOpenChange, onNoteUpdate }: DayDialogProps) => {
+  const [currentProjectNotes, setCurrentProjectNotes] = React.useState<Record<string, string>>({});
+  const [currentDailyNote, setCurrentDailyNote] = React.useState('');
+  const upsertProjectNoteMutation = useUpsertProjectNote();
+  const upsertDailyNoteMutation = useUpsertDailyNote();
 
   React.useEffect(() => {
     if (date) {
-      const initialNotes: Record<string, string> = {};
-      notes.forEach(note => {
-        initialNotes[note.project_id] = note.note;
+      const initialProjectNotes: Record<string, string> = {};
+      projectNotes.forEach(note => {
+        initialProjectNotes[note.project_id] = note.note;
       });
-      setCurrentNotes(initialNotes);
+      setCurrentProjectNotes(initialProjectNotes);
+      setCurrentDailyNote(dailyNote?.note || '');
     }
-  }, [date, notes, open]);
+  }, [date, projectNotes, dailyNote, open]);
 
   if (!date) return null;
 
   const projectsOnDay = Array.from(new Map(phases.map(p => [p.projectId, p])).values());
 
-  const handleNoteChange = (projectId: string, value: string) => {
-    setCurrentNotes(prev => ({ ...prev, [projectId]: value }));
+  const handleProjectNoteChange = (projectId: string, value: string) => {
+    setCurrentProjectNotes(prev => ({ ...prev, [projectId]: value }));
   };
   
   const handleSaveNotes = async () => {
     if (!date) return;
     const dateString = format(date, 'yyyy-MM-dd');
     
-    const notePromises = Object.entries(currentNotes).map(([projectId, note]) => {
-      return upsertNoteMutation.mutateAsync({
-        project_id: projectId,
-        date: dateString,
-        note: note,
-      });
+    const projectNotePromises = Object.entries(currentProjectNotes).map(([projectId, note]) => {
+      const originalNote = projectNotes.find(n => n.project_id === projectId);
+      // Upsert only if note has changed or is new
+      if (note !== (originalNote?.note || '')) {
+        return upsertProjectNoteMutation.mutateAsync({
+          project_id: projectId,
+          date: dateString,
+          note: note,
+        });
+      }
+      return Promise.resolve();
     });
 
-    await Promise.all(notePromises);
+    const dailyNotePromise = (currentDailyNote !== (dailyNote?.note || '')) 
+      ? upsertDailyNoteMutation.mutateAsync({
+          date: dateString,
+          note: currentDailyNote,
+        })
+      : Promise.resolve();
+
+    await Promise.all([...projectNotePromises, dailyNotePromise]);
     onNoteUpdate();
     onOpenChange(false);
   };
@@ -60,16 +78,31 @@ const DayDialog = ({ date, phases, notes, open, onOpenChange, onNoteUpdate }: Da
       alert("As mentioned, deleting phases is not possible right now because a core scheduling file is read-only. This button is a placeholder for when that capability is enabled.");
   };
 
+  const isSaving = upsertProjectNoteMutation.isPending || upsertDailyNoteMutation.isPending;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[625px]">
         <DialogHeader>
           <DialogTitle>Details for {format(date, 'MMMM d, yyyy')}</DialogTitle>
           <DialogDescription>
-            View scheduled phases and add notes for projects on this day.
+            View scheduled phases and add notes for projects or the day in general.
           </DialogDescription>
         </DialogHeader>
         <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+            <div>
+              <label htmlFor={`note-daily`} className="text-sm font-medium text-muted-foreground mb-1 block">General Note for Day</label>
+              <Textarea
+                id={`note-daily`}
+                placeholder={`Add a general note for this day...`}
+                value={currentDailyNote}
+                onChange={(e) => setCurrentDailyNote(e.target.value)}
+                className="min-h-[80px]"
+              />
+            </div>
+          
+          {projectsOnDay.length > 0 && <Separator className="my-4" />}
+
           {projectsOnDay.length > 0 ? (
             projectsOnDay.map(project => (
               <div key={project.projectId} className="p-4 border rounded-lg">
@@ -92,22 +125,22 @@ const DayDialog = ({ date, phases, notes, open, onOpenChange, onNoteUpdate }: Da
                   <label htmlFor={`note-${project.projectId}`} className="text-sm font-medium text-muted-foreground mb-1 block">Notes for {project.projectName}</label>
                   <Textarea
                     id={`note-${project.projectId}`}
-                    placeholder={`Add a note for this project on this day...`}
-                    value={currentNotes[project.projectId] || ''}
-                    onChange={(e) => handleNoteChange(project.projectId, e.target.value)}
+                    placeholder={`Add a project-specific note for this day...`}
+                    value={currentProjectNotes[project.projectId] || ''}
+                    onChange={(e) => handleProjectNoteChange(project.projectId, e.target.value)}
                     className="min-h-[80px]"
                   />
                 </div>
               </div>
             ))
           ) : (
-            <p className="text-muted-foreground text-center py-8">No projects scheduled for this day.</p>
+            <p className="text-muted-foreground text-center py-4">No projects scheduled for this day.</p>
           )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSaveNotes} disabled={upsertNoteMutation.isPending}>
-            {upsertNoteMutation.isPending ? 'Saving...' : 'Save Notes'}
+          <Button onClick={handleSaveNotes} disabled={isSaving}>
+            {isSaving ? 'Saving...' : 'Save Notes'}
           </Button>
         </DialogFooter>
       </DialogContent>
