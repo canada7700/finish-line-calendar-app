@@ -1,7 +1,8 @@
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ProjectPhase } from '../types/project';
 import { addMonths, subMonths, isSameMonth } from 'date-fns';
-import { supabase } from '@/integrations/supabase/client';
+import { useHolidays } from '@/hooks/useHolidays';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import MonthView from "./MonthView";
 import { AlertTriangle, Loader2 } from 'lucide-react';
@@ -12,8 +13,7 @@ interface CalendarViewProps {
 
 export const CalendarView = ({ phases }: CalendarViewProps) => {
   const [monthsToRender, setMonthsToRender] = useState([new Date()]);
-  const [holidays, setHolidays] = useState<string[]>([]);
-  const [holidaysLoaded, setHolidaysLoaded] = useState(false);
+  const { holidays, isLoading: isLoadingHolidays } = useHolidays();
 
   const observer = useRef<IntersectionObserver>();
   const topSentinelRef = useRef<HTMLDivElement>(null);
@@ -22,29 +22,6 @@ export const CalendarView = ({ phases }: CalendarViewProps) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const currentMonthRef = useRef<HTMLDivElement>(null);
   const hasScrolledToCurrentMonth = useRef(false);
-
-  useEffect(() => {
-    const loadHolidays = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('holidays')
-          .select('date');
-        
-        if (error) {
-          console.error('❌ CalendarView: Error loading holidays:', error);
-          return;
-        }
-        
-        const holidayDates = data.map(h => h.date);
-        setHolidays(holidayDates);
-        setHolidaysLoaded(true);
-      } catch (error) {
-        console.error('❌ CalendarView: Failed to load holidays:', error);
-      }
-    };
-
-    loadHolidays();
-  }, []);
 
   const loadPrevious = useCallback(() => {
     setMonthsToRender(prev => [subMonths(prev[0], 1), ...prev]);
@@ -75,11 +52,11 @@ export const CalendarView = ({ phases }: CalendarViewProps) => {
   }, [loadPrevious, loadNext]);
 
   useEffect(() => {
-    if (holidaysLoaded && currentMonthRef.current && !hasScrolledToCurrentMonth.current) {
+    if (!isLoadingHolidays && currentMonthRef.current && !hasScrolledToCurrentMonth.current) {
         currentMonthRef.current.scrollIntoView({ block: 'start' });
         hasScrolledToCurrentMonth.current = true;
     }
-  }, [holidaysLoaded, monthsToRender]);
+  }, [isLoadingHolidays, monthsToRender]);
 
   return (
     <ScrollArea className="h-full p-4 md:p-6" ref={scrollContainerRef}>
@@ -96,7 +73,7 @@ export const CalendarView = ({ phases }: CalendarViewProps) => {
       
       <div ref={topSentinelRef} className="h-1" />
       
-      {holidaysLoaded ? (
+      {!isLoadingHolidays ? (
         monthsToRender.map(month => {
           const isCurrent = isSameMonth(month, new Date());
           return (

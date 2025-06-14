@@ -1,13 +1,15 @@
 
+import { useMemo } from 'react';
 import { ProjectPhase } from '../types/project';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, getDay, startOfWeek, endOfWeek } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, startOfWeek, endOfWeek } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertTriangle } from 'lucide-react';
+import { Holiday } from '@/hooks/useHolidays';
 
 interface MonthViewProps {
   monthDate: Date;
   phases: ProjectPhase[];
-  holidays: string[];
+  holidays: Holiday[];
 }
 
 const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
@@ -17,14 +19,16 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
   const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+  
+  const holidaysMap = useMemo(() => new Map(holidays.map(h => [h.date, h.name])), [holidays]);
 
   const isNonWorkingDay = (date: Date) => {
     const isWeekendDay = isWeekend(date);
     const dateString = format(date, 'yyyy-MM-dd');
-    const isHoliday = holidays.includes(dateString);
+    const holidayName = holidaysMap.get(dateString);
     
     if (isWeekendDay) return { isNonWorking: true, reason: 'Weekend' };
-    if (isHoliday) return { isNonWorking: true, reason: 'Holiday' };
+    if (holidayName) return { isNonWorking: true, reason: holidayName };
     return { isNonWorking: false };
   };
   
@@ -90,7 +94,7 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
                 </div>
                 
                 {nonWorkingInfo.isNonWorking && isCurrentMonth && (
-                  <div className="text-xs text-gray-600 mb-1">
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 truncate" title={nonWorkingInfo.reason}>
                     {nonWorkingInfo.reason}
                   </div>
                 )}
