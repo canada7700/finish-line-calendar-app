@@ -371,3 +371,19 @@ export class ProjectScheduler {
     };
   }
 }
+
+// New function to generate phases for all projects
+export const getProjectPhases = async (projects: Project[]): Promise<ProjectPhase[]> => {
+  console.log('🎭 Generating phases for all projects...');
+  await ProjectScheduler.loadHolidays(); // Ensure holidays are loaded
+
+  let allPhases: ProjectPhase[] = [];
+  for (const project of projects) {
+    // Since generateProjectPhases is async, we need to await it.
+    const projectPhases = await ProjectScheduler.generateProjectPhases(project);
+    allPhases = allPhases.concat(projectPhases);
+  }
+
+  console.log(`✅ Generated a total of ${allPhases.length} phases for ${projects.length} projects.`);
+  return allPhases;
+};

@@ -1,4 +1,5 @@
 
+import { useState, useEffect } from 'react';
 import { useProjects } from '@/hooks/useProjects';
 import { getProjectPhases } from '@/utils/projectScheduler';
 import { CalendarView } from '@/components/CalendarView';
@@ -6,9 +7,23 @@ import { ProjectPhase } from '@/types/project';
 import { Skeleton } from "@/components/ui/skeleton";
 
 const CalendarPage = () => {
-  const { projects, isLoading } = useProjects();
-  
-  const phases: ProjectPhase[] = projects ? getProjectPhases(projects) : [];
+  const { projects, isLoading: isLoadingProjects } = useProjects();
+  const [phases, setPhases] = useState<ProjectPhase[]>([]);
+  const [isLoadingPhases, setIsLoadingPhases] = useState(true);
+
+  useEffect(() => {
+    if (projects && projects.length > 0) {
+      setIsLoadingPhases(true);
+      getProjectPhases(projects)
+        .then(setPhases)
+        .finally(() => setIsLoadingPhases(false));
+    } else if (!isLoadingProjects) {
+        setPhases([]);
+        setIsLoadingPhases(false);
+    }
+  }, [projects, isLoadingProjects]);
+
+  const isLoading = isLoadingProjects || isLoadingPhases;
 
   return (
     <div className="h-[calc(100vh-4rem)]">

@@ -73,7 +73,7 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
             const dayPhases = getPhasesForDate(day);
             const nonWorkingInfo = isNonWorkingDay(day);
             const hasSchedulingConflict = dayPhases.length > 0 && nonWorkingInfo.isNonWorking;
-            const isCurrentMonth = day >= monthStart && date <= monthEnd;
+            const isCurrentMonth = day >= monthStart && day <= monthEnd;
             
             return (
               <div
