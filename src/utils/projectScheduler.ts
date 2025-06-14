@@ -202,7 +202,8 @@ export class ProjectScheduler {
     // Get working hours
     const { shopHours, stainHours } = await this.getWorkingHours();
     
-    const installDate = new Date(project.installDate);
+    // By appending 'T00:00:00', we parse the date in the local timezone, not UTC.
+    const installDate = new Date(`${project.installDate}T00:00:00`);
     console.log('📅 Original install date:', format(installDate, 'yyyy-MM-dd'));
     
     // Validate install date is a working day and adjust if needed
@@ -259,7 +260,8 @@ export class ProjectScheduler {
     
     // Shop phase - create individual phases for each working day
     if (calculatedProject.shopStartDate) {
-      const shopStartDate = new Date(calculatedProject.shopStartDate);
+      // Parse as local time to avoid timezone shift
+      const shopStartDate = new Date(`${calculatedProject.shopStartDate}T00:00:00`);
       const shopDuration = Math.ceil(project.shopHrs / shopHours);
       
       console.log(`🔨 Generating shop phases for ${shopDuration} working days starting ${format(shopStartDate, 'yyyy-MM-dd')}`);
@@ -291,7 +293,8 @@ export class ProjectScheduler {
     
     // Stain phase - create individual phases for each working day
     if (calculatedProject.stainStartDate) {
-      const stainStartDate = new Date(calculatedProject.stainStartDate);
+      // Parse as local time to avoid timezone shift
+      const stainStartDate = new Date(`${calculatedProject.stainStartDate}T00:00:00`);
       const stainDuration = Math.ceil(project.stainHrs / stainHours);
       
       console.log(`🎨 Generating stain phases for ${stainDuration} working days starting ${format(stainStartDate, 'yyyy-MM-dd')}`);
@@ -322,7 +325,8 @@ export class ProjectScheduler {
     }
     
     // Install phase - create individual phases for each working day
-    const installStartDate = new Date(calculatedProject.installDate);
+    // Parse as local time to avoid timezone shift
+    const installStartDate = new Date(`${calculatedProject.installDate}T00:00:00`);
     const installDuration = Math.ceil(project.installHrs / shopHours);
     
     console.log(`🔧 Generating install phases for ${installDuration} working days starting ${format(installStartDate, 'yyyy-MM-dd')}`);

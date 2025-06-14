@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Project } from '../types/project';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,10 +43,9 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false, projectToEdit =
         installHrs: projectToEdit.installHrs,
       });
       if (projectToEdit.installDate) {
-        // Adjust for timezone to prevent date from showing as the previous day
-        const date = new Date(projectToEdit.installDate);
-        const userTimezoneOffset = date.getTimezoneOffset() * 60000;
-        setInstallDate(new Date(date.getTime() + userTimezoneOffset));
+        // By appending 'T00:00:00', we tell the Date constructor to parse the date
+        // in the local timezone, which prevents it from shifting to the previous day.
+        setInstallDate(new Date(`${projectToEdit.installDate}T00:00:00`));
       }
       setDateWarning('');
     } else {

@@ -80,7 +80,7 @@ const ProjectCard = ({ project, onEdit, onDelete }: ProjectCardProps) => {
           </div>
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <Calendar className="h-4 w-4" />
-            <span>Install: {project.installDate ? format(new Date(project.installDate), 'MMM dd') : 'N/A'}</span>
+            <span>Install: {project.installDate ? format(new Date(`${project.installDate}T00:00:00`), 'MMM dd') : 'N/A'}</span>
           </div>
         </div>
       </CardContent>
