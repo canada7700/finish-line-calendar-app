@@ -7,6 +7,7 @@ import { AlertTriangle, MessageSquare } from 'lucide-react';
 import { Holiday } from '@/hooks/useHolidays';
 import { useProjectNotes } from '@/hooks/useProjectNotes';
 import { useDailyNotes } from '@/hooks/useDailyNotes';
+import { usePhaseExceptions } from '@/hooks/usePhaseExceptions';
 import DayDialog from './DayDialog';
 
 interface MonthViewProps {
@@ -23,6 +24,7 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
   
   const { data: projectNotes = [], refetch: refetchProjectNotes } = useProjectNotes(monthStart, monthEnd);
   const { data: dailyNotes = [], refetch: refetchDailyNotes } = useDailyNotes(monthStart, monthEnd);
+  const { data: phaseExceptions = [], refetch: refetchPhaseExceptions } = usePhaseExceptions();
 
   const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
@@ -49,6 +51,15 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
     return map;
   }, [dailyNotes]);
 
+  const phaseExceptionsMap = useMemo(() => {
+    const map = new Map<string, boolean>();
+    phaseExceptions.forEach(ex => {
+      const key = `${ex.project_id}-${ex.phase}-${ex.date}`;
+      map.set(key, true);
+    });
+    return map;
+  }, [phaseExceptions]);
+
   const isNonWorkingDay = (date: Date) => {
     const isWeekendDay = isWeekend(date);
     const dateString = format(date, 'yyyy-MM-dd');
@@ -61,7 +72,13 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
   
   const getPhasesForDate = (date: Date) => {
     const dateString = format(date, 'yyyy-MM-dd');
-    return phases.filter(phase => phase.startDate === dateString && phase.endDate === dateString);
+    return phases.filter(phase => {
+      if (phase.startDate !== dateString || phase.endDate !== dateString) {
+        return false;
+      }
+      const exceptionKey = `${phase.projectId}-${phase.phase}-${dateString}`;
+      return !phaseExceptionsMap.has(exceptionKey);
+    });
   };
 
   const getDayClasses = (date: Date, dayPhases: ProjectPhase[]) => {
@@ -92,6 +109,7 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
   const handleNoteUpdate = () => {
     refetchProjectNotes();
     refetchDailyNotes();
+    refetchPhaseExceptions();
   };
 
   return (

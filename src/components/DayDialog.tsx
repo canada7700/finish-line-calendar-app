@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { ProjectPhase, ProjectNote, DailyNote } from '../types/project';
 import { format } from 'date-fns';
@@ -7,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useUpsertNote as useUpsertProjectNote } from '@/hooks/useProjectNotes';
 import { useUpsertDailyNote } from '@/hooks/useDailyNotes';
+import { useAddPhaseException } from '@/hooks/usePhaseExceptions';
 import { AlertTriangle, Trash2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 
@@ -25,6 +25,7 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, open, onOpenChange, 
   const [currentDailyNote, setCurrentDailyNote] = React.useState('');
   const upsertProjectNoteMutation = useUpsertProjectNote();
   const upsertDailyNoteMutation = useUpsertDailyNote();
+  const addPhaseExceptionMutation = useAddPhaseException();
 
   React.useEffect(() => {
     if (date) {
@@ -74,8 +75,15 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, open, onOpenChange, 
     onOpenChange(false);
   };
 
-  const handlePhaseDelete = (phaseId: string) => {
-      alert("As mentioned, deleting phases is not possible right now because a core scheduling file is read-only. This button is a placeholder for when that capability is enabled.");
+  const handlePhaseDelete = async (phaseToDelete: ProjectPhase) => {
+    if (!date) return;
+    
+    await addPhaseExceptionMutation.mutateAsync({
+      project_id: phaseToDelete.projectId,
+      phase: phaseToDelete.phase,
+      date: format(date, 'yyyy-MM-dd'),
+    });
+    onNoteUpdate();
   };
 
   const isSaving = upsertProjectNoteMutation.isPending || upsertDailyNoteMutation.isPending;
@@ -115,7 +123,13 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, open, onOpenChange, 
                         <span className="font-medium">{phase.phase.toUpperCase()}</span>
                         <span className="text-sm text-muted-foreground">({phase.hours}h)</span>
                       </div>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => handlePhaseDelete(phase.id)}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        onClick={() => handlePhaseDelete(phase)}
+                        disabled={addPhaseExceptionMutation.isPending}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
