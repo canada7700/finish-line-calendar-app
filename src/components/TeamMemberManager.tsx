@@ -10,6 +10,21 @@ import { Trash2, Plus, Edit2, Users } from 'lucide-react';
 import { useTeamMembers } from '../hooks/useTeamMembers';
 import { TeamMember } from '../types/project';
 
+const SKILL_COLORS = {
+  shop: {
+    base: 'bg-blue-500 text-white hover:bg-blue-500/90 border-transparent',
+    switch: 'data-[state=checked]:bg-blue-500',
+  },
+  stain: {
+    base: 'bg-purple-500 text-white hover:bg-purple-500/90 border-transparent',
+    switch: 'data-[state=checked]:bg-purple-500',
+  },
+  install: {
+    base: 'bg-green-500 text-white hover:bg-green-500/90 border-transparent',
+    switch: 'data-[state=checked]:bg-green-500',
+  },
+};
+
 const TeamMemberManager = () => {
   const { teamMembers, addTeamMember, updateTeamMember, deleteTeamMember, isAddingTeamMember, isUpdatingTeamMember, isDeletingTeamMember } = useTeamMembers();
   
@@ -81,10 +96,10 @@ const TeamMemberManager = () => {
   };
 
   const getSkillBadges = (member: TeamMember) => {
-    const skills = [];
-    if (member.canDoShop) skills.push('Shop');
-    if (member.canDoStain) skills.push('Stain');
-    if (member.canDoInstall) skills.push('Install');
+    const skills: {name: string, className: string}[] = [];
+    if (member.canDoShop) skills.push({ name: 'Shop', className: SKILL_COLORS.shop.base });
+    if (member.canDoStain) skills.push({ name: 'Stain', className: SKILL_COLORS.stain.base });
+    if (member.canDoInstall) skills.push({ name: 'Install', className: SKILL_COLORS.install.base });
     return skills;
   };
 
@@ -174,6 +189,7 @@ const TeamMemberManager = () => {
                         id="canDoShop"
                         checked={formData.canDoShop}
                         onCheckedChange={(checked) => setFormData(prev => ({ ...prev, canDoShop: checked }))}
+                        className={SKILL_COLORS.shop.switch}
                       />
                       <Label htmlFor="canDoShop">Shop Work</Label>
                     </div>
@@ -182,6 +198,7 @@ const TeamMemberManager = () => {
                         id="canDoStain"
                         checked={formData.canDoStain}
                         onCheckedChange={(checked) => setFormData(prev => ({ ...prev, canDoStain: checked }))}
+                        className={SKILL_COLORS.stain.switch}
                       />
                       <Label htmlFor="canDoStain">Staining</Label>
                     </div>
@@ -190,6 +207,7 @@ const TeamMemberManager = () => {
                         id="canDoInstall"
                         checked={formData.canDoInstall}
                         onCheckedChange={(checked) => setFormData(prev => ({ ...prev, canDoInstall: checked }))}
+                        className={SKILL_COLORS.install.switch}
                       />
                       <Label htmlFor="canDoInstall">Installation</Label>
                     </div>
@@ -226,8 +244,8 @@ const TeamMemberManager = () => {
                       </div>
                       <div className="flex gap-1">
                         {getSkillBadges(member).map(skill => (
-                          <Badge key={skill} variant="secondary" className="text-xs">
-                            {skill}
+                          <Badge key={skill.name} variant="default" className={`text-xs ${skill.className}`}>
+                            {skill.name}
                           </Badge>
                         ))}
                       </div>
