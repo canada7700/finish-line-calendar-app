@@ -1,3 +1,4 @@
+
 import { Project, ProjectPhase } from '../types/project';
 import { addDays, subDays, format, isWeekend, parseISO, eachDayOfInterval } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -306,7 +307,7 @@ export class ProjectScheduler {
         });
         
         console.log(`✅ Created shop phase for ${format(currentDate, 'yyyy-MM-dd')}`);
-        currentDate = addDays(currentDate, 1);
+        currentDate = this.getNextWorkingDay(currentDate);
       }
     }
     
@@ -339,7 +340,7 @@ export class ProjectScheduler {
         });
         
         console.log(`✅ Created stain phase for ${format(currentDate, 'yyyy-MM-dd')}`);
-        currentDate = addDays(currentDate, 1);
+        currentDate = this.getNextWorkingDay(currentDate);
       }
     }
     
@@ -371,7 +372,7 @@ export class ProjectScheduler {
       });
       
       console.log(`✅ Created install phase for ${format(currentDate, 'yyyy-MM-dd')}`);
-      currentDate = addDays(currentDate, 1);
+      currentDate = this.getNextWorkingDay(currentDate);
     }
     
     console.log(`✅ Generated ${phases.length} project phases (working days only)`);
