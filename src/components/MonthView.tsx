@@ -68,7 +68,7 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
     const nonWorkingInfo = isNonWorkingDay(date);
     const isCurrentMonth = date >= monthStart && date <= monthEnd;
     
-    let classes = "min-h-[100px] p-1 border border-border rounded-sm transition-colors cursor-pointer hover:bg-muted/50 ";
+    let classes = "min-h-[120px] p-1 border border-border rounded-sm transition-colors cursor-pointer hover:bg-muted/50 flex flex-col ";
     
     if (!isCurrentMonth) {
       classes += "bg-gray-50 dark:bg-gray-800/20 opacity-50 ";
@@ -126,27 +126,35 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
                   className={getDayClasses(day, dayPhases)}
                   onClick={() => handleDayClick(day)}
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <div className={`text-sm font-medium ${isCurrentMonth ? 'text-foreground' : 'text-gray-400'}`}>
-                      {format(day, 'd')}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className={`text-sm font-medium ${isCurrentMonth ? 'text-foreground' : 'text-gray-400'}`}>
+                        {format(day, 'd')}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {hasNotes && isCurrentMonth && (
+                          <MessageSquare className="h-3 w-3 text-blue-500" />
+                        )}
+                        {hasSchedulingConflict && (
+                          <AlertTriangle className="h-3 w-3 text-red-500" />
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      {hasNotes && isCurrentMonth && (
-                        <MessageSquare className="h-3 w-3 text-blue-500" />
-                      )}
-                      {hasSchedulingConflict && (
-                        <AlertTriangle className="h-3 w-3 text-red-500" />
-                      )}
-                    </div>
+                    
+                    {nonWorkingInfo.isNonWorking && isCurrentMonth && (
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 truncate" title={nonWorkingInfo.reason}>
+                        {nonWorkingInfo.reason}
+                      </div>
+                    )}
+
+                    {isCurrentMonth && dayDailyNote?.note && (
+                      <div className="mt-1 text-xs text-muted-foreground break-words">
+                        <p className="line-clamp-2">{dayDailyNote.note}</p>
+                      </div>
+                    )}
                   </div>
                   
-                  {nonWorkingInfo.isNonWorking && isCurrentMonth && (
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 truncate" title={nonWorkingInfo.reason}>
-                      {nonWorkingInfo.reason}
-                    </div>
-                  )}
-                  
-                  <div className="space-y-1">
+                  <div className="space-y-1 mt-auto pt-1">
                     {dayPhases.map(phase => (
                       <div
                         key={phase.id}
