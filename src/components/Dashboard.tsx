@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Project, ProjectPhase } from '../types/project';
 import { ProjectScheduler } from '../utils/projectScheduler';
@@ -15,7 +14,8 @@ import { toast } from '@/hooks/use-toast';
 
 const Dashboard = () => {
   const { projects, isLoading, addProject, isAddingProject, deleteProject, updateProject, isUpdatingProject } = useProjects();
-  const [showForm, setShowForm] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [projectToEdit, setProjectToEdit] = useState<Project | null>(null);
   const [activeTab, setActiveTab] = useState('projects');
   const [allPhases, setAllPhases] = useState<ProjectPhase[]>([]);
   const [isRecalculating, setIsRecalculating] = useState(false);
@@ -40,15 +40,45 @@ const Dashboard = () => {
     }
   }, [projects]);
 
-  const handleAddProject = async (projectData: Omit<Project, 'id'>) => {
-    // Create a temporary project with an id for calculation purposes
-    const tempProject = { ...projectData, id: 'temp' };
-    const calculatedProject = await ProjectScheduler.calculateProjectDates(tempProject);
-    console.log('Submitting project with calculated dates:', calculatedProject);
-    // Remove the temporary id since addProject expects Omit<Project, 'id'>
-    const { id, ...projectWithoutId } = calculatedProject;
-    addProject(projectWithoutId);
-    setShowForm(false);
+  const handleAddProjectClick = () => {
+    setProjectToEdit(null);
+    setShowAddForm(true);
+  };
+
+  const handleEditProjectClick = (project: Project) => {
+    setShowAddForm(false);
+    setProjectToEdit(project);
+  };
+
+  const handleCancelForm = () => {
+    setShowAddForm(false);
+    setProjectToEdit(null);
+  };
+
+  const handleFormSubmit = async (projectData: Omit<Project, 'id'> | Project) => {
+    const isEditing = 'id' in projectData;
+    handleCancelForm();
+
+    try {
+      const calculatedProject = await ProjectScheduler.calculateProjectDates(projectData as Project);
+
+      if (isEditing) {
+        updateProject(calculatedProject, {
+          onSuccess: () => {
+            toast({ title: "Project Updated", description: "Project has been updated successfully." });
+          },
+          onError: (error) => {
+            toast({ title: "Update Failed", description: `Could not update project: ${error.message}`, variant: "destructive" });
+          }
+        });
+      } else {
+        const { id, ...projectWithoutId } = calculatedProject;
+        addProject(projectWithoutId);
+      }
+    } catch (error) {
+      console.error("Error submitting form", error);
+      toast({ title: "Error", description: `An error occurred during date calculation.`, variant: "destructive" });
+    }
   };
 
   const handleRecalculateAll = async () => {
@@ -178,15 +208,17 @@ const Dashboard = () => {
   };
 
   const statusCounts = getStatusCounts();
+  const isFormVisible = showAddForm || !!projectToEdit;
 
-  if (showForm) {
+  if (isFormVisible) {
     return (
       <div className="min-h-screen bg-background p-6">
         <div className="max-w-7xl mx-auto">
           <ProjectForm
-            onSubmit={handleAddProject}
-            onCancel={() => setShowForm(false)}
-            isSubmitting={isAddingProject}
+            projectToEdit={projectToEdit}
+            onSubmit={handleFormSubmit}
+            onCancel={handleCancelForm}
+            isSubmitting={isAddingProject || isUpdatingProject}
           />
         </div>
       </div>
@@ -233,7 +265,7 @@ const Dashboard = () => {
                 <RefreshCw className={`h-4 w-4 ${isRecalculating ? 'animate-spin' : ''}`} />
                 {isRecalculating ? 'Recalculating...' : 'Recalculate Dates'}
               </Button>
-              <Button onClick={() => setShowForm(true)} className="flex items-center gap-2">
+              <Button onClick={handleAddProjectClick} className="flex items-center gap-2">
                 <Plus className="h-4 w-4" />
                 Add Project
               </Button>
@@ -292,7 +324,7 @@ const Dashboard = () => {
             {projects.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-muted-foreground mb-4">No projects found. Add your first project to get started!</p>
-                <Button onClick={() => setShowForm(true)} className="flex items-center gap-2">
+                <Button onClick={handleAddProjectClick} className="flex items-center gap-2">
                   <Plus className="h-4 w-4" />
                   Add Project
                 </Button>
@@ -303,7 +335,7 @@ const Dashboard = () => {
                   <ProjectCard
                     key={project.id}
                     project={project}
-                    onClick={() => console.log('Project clicked:', project.id)}
+                    onEdit={handleEditProjectClick}
                     onDelete={deleteProject}
                   />
                 ))}
@@ -312,7 +344,7 @@ const Dashboard = () => {
           </TabsContent>
 
           <TabsContent value="list" className="space-y-6">
-            <ProjectListView projects={projects} onDelete={deleteProject} />
+            <ProjectListView projects={projects} onEdit={handleEditProjectClick} onDelete={deleteProject} />
           </TabsContent>
 
           <TabsContent value="calendar" className="space-y-6">

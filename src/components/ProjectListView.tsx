@@ -15,13 +15,14 @@ import { ArrowUpDown, Trash2 } from 'lucide-react';
 
 interface ProjectListViewProps {
   projects: Project[];
+  onEdit?: (project: Project) => void;
   onDelete?: (projectId: string) => void;
 }
 
 type SortField = 'jobName' | 'installDate' | 'totalHours' | 'status';
 type SortDirection = 'asc' | 'desc';
 
-const ProjectListView = ({ projects, onDelete }: ProjectListViewProps) => {
+const ProjectListView = ({ projects, onEdit, onDelete }: ProjectListViewProps) => {
   const [sortField, setSortField] = useState<SortField>('installDate');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
@@ -92,7 +93,9 @@ const ProjectListView = ({ projects, onDelete }: ProjectListViewProps) => {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
+    const date = new Date(dateString);
+    const userTimezoneOffset = date.getTimezoneOffset() * 60000;
+    return new Date(date.getTime() + userTimezoneOffset).toLocaleDateString();
   };
 
   return (
@@ -149,7 +152,7 @@ const ProjectListView = ({ projects, onDelete }: ProjectListViewProps) => {
         </TableHeader>
         <TableBody>
           {sortedProjects.map((project) => (
-            <TableRow key={project.id} className="hover:bg-muted/50">
+            <TableRow key={project.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => onEdit?.(project)}>
               <TableCell className="font-medium">{project.jobName}</TableCell>
               <TableCell className="max-w-xs truncate">{project.jobDescription}</TableCell>
               <TableCell>
@@ -169,7 +172,10 @@ const ProjectListView = ({ projects, onDelete }: ProjectListViewProps) => {
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-red-50"
-                  onClick={() => handleDelete(project.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(project.id)
+                  }}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>

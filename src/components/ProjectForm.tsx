@@ -1,5 +1,4 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Project } from '../types/project';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,23 +12,55 @@ import { cn } from '@/lib/utils';
 import { ProjectScheduler } from '../utils/projectScheduler';
 
 interface ProjectFormProps {
-  onSubmit: (project: Omit<Project, 'id'>) => void;
+  onSubmit: (project: Omit<Project, 'id'> | Project) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
+  projectToEdit?: Project | null;
 }
 
-const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false }: ProjectFormProps) => {
+const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false, projectToEdit = null }: ProjectFormProps) => {
+  const isEditing = !!projectToEdit;
+
   const [formData, setFormData] = useState({
     jobName: '',
     jobDescription: '',
     shopHrs: 0,
     stainHrs: 0,
     installHrs: 0,
-    installDate: '',
   });
 
   const [installDate, setInstallDate] = useState<Date>();
   const [dateWarning, setDateWarning] = useState<string>('');
+
+  useEffect(() => {
+    if (isEditing && projectToEdit) {
+      setFormData({
+        jobName: projectToEdit.jobName,
+        jobDescription: projectToEdit.jobDescription,
+        shopHrs: projectToEdit.shopHrs,
+        stainHrs: projectToEdit.stainHrs,
+        installHrs: projectToEdit.installHrs,
+      });
+      if (projectToEdit.installDate) {
+        // Adjust for timezone to prevent date from showing as the previous day
+        const date = new Date(projectToEdit.installDate);
+        const userTimezoneOffset = date.getTimezoneOffset() * 60000;
+        setInstallDate(new Date(date.getTime() + userTimezoneOffset));
+      }
+      setDateWarning('');
+    } else {
+      // Reset form when not editing
+      setFormData({
+        jobName: '',
+        jobDescription: '',
+        shopHrs: 0,
+        stainHrs: 0,
+        installHrs: 0,
+      });
+      setInstallDate(undefined);
+      setDateWarning('');
+    }
+  }, [projectToEdit, isEditing]);
 
   const handleInstallDateSelect = async (date: Date | undefined) => {
     setInstallDate(date);
@@ -55,17 +86,22 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false }: ProjectFormPr
     e.preventDefault();
     if (!installDate) return;
 
-    console.log('Form submission data:', {
-      ...formData,
-      installDate: format(installDate, 'yyyy-MM-dd'),
-      status: 'planning' as const,
-    });
-
-    onSubmit({
-      ...formData,
-      installDate: format(installDate, 'yyyy-MM-dd'),
-      status: 'planning' as const,
-    });
+    const baseProjectData = {
+        ...formData,
+        installDate: format(installDate, 'yyyy-MM-dd'),
+    };
+    
+    if (isEditing && projectToEdit) {
+        onSubmit({
+            ...projectToEdit,
+            ...baseProjectData
+        });
+    } else {
+        onSubmit({
+            ...baseProjectData,
+            status: 'planning' as const,
+        });
+    }
   };
 
   const handleInputChange = (field: string, value: string | number) => {
@@ -78,7 +114,7 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false }: ProjectFormPr
   return (
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader>
-        <CardTitle>Add New Project</CardTitle>
+        <CardTitle>{isEditing ? 'Edit Project' : 'Add New Project'}</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -183,7 +219,7 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false }: ProjectFormPr
 
           <div className="flex gap-3 pt-4">
             <Button type="submit" className="flex-1" disabled={isSubmitting}>
-              {isSubmitting ? 'Adding Project...' : 'Add Project'}
+              {isSubmitting ? (isEditing ? 'Saving...' : 'Adding...') : (isEditing ? 'Save Changes' : 'Add Project')}
             </Button>
             <Button 
               type="button" 

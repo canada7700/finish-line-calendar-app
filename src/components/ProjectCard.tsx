@@ -8,11 +8,11 @@ import { format } from 'date-fns';
 
 interface ProjectCardProps {
   project: Project;
-  onClick?: () => void;
+  onEdit?: (project: Project) => void;
   onDelete?: (projectId: string) => void;
 }
 
-const ProjectCard = ({ project, onClick, onDelete }: ProjectCardProps) => {
+const ProjectCard = ({ project, onEdit, onDelete }: ProjectCardProps) => {
   const getStatusColor = (status: Project['status']) => {
     switch (status) {
       case 'planning': return 'bg-gray-500';
@@ -36,7 +36,7 @@ const ProjectCard = ({ project, onClick, onDelete }: ProjectCardProps) => {
   return (
     <Card 
       className="hover:shadow-lg transition-all duration-200 cursor-pointer hover:scale-[1.02] relative"
-      onClick={onClick}
+      onClick={() => onEdit?.(project)}
     >
       <CardHeader className="pb-3">
         <div className="flex justify-between items-start">
@@ -80,7 +80,7 @@ const ProjectCard = ({ project, onClick, onDelete }: ProjectCardProps) => {
           </div>
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <Calendar className="h-4 w-4" />
-            <span>Install: {format(new Date(project.installDate), 'MMM dd')}</span>
+            <span>Install: {project.installDate ? format(new Date(project.installDate), 'MMM dd') : 'N/A'}</span>
           </div>
         </div>
       </CardContent>
