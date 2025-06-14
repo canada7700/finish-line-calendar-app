@@ -16,8 +16,8 @@ const SKILL_COLORS = {
     switch: 'data-[state=checked]:bg-blue-500',
   },
   stain: {
-    base: 'bg-purple-500 text-white hover:bg-purple-500/90 border-transparent',
-    switch: 'data-[state=checked]:bg-purple-500',
+    base: 'bg-amber-500 text-white hover:bg-amber-500/90 border-transparent',
+    switch: 'data-[state=checked]:bg-amber-500',
   },
   install: {
     base: 'bg-green-500 text-white hover:bg-green-500/90 border-transparent',
