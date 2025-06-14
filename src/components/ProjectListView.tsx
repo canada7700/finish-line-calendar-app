@@ -55,8 +55,8 @@ const ProjectListView = ({ projects, onEdit, onDelete }: ProjectListViewProps) =
         bValue = new Date(b.installDate);
         break;
       case 'totalHours':
-        aValue = a.shopHrs + a.stainHrs + a.installHrs;
-        bValue = b.shopHrs + b.stainHrs + b.installHrs;
+        aValue = a.millworkHrs + a.boxConstructionHrs + a.stainHrs + a.installHrs;
+        bValue = b.millworkHrs + b.boxConstructionHrs + b.stainHrs + b.installHrs;
         break;
       case 'status':
         aValue = a.status;
@@ -144,7 +144,8 @@ const ProjectListView = ({ projects, onEdit, onDelete }: ProjectListViewProps) =
                 <ArrowUpDown className="ml-2 h-4 w-4" />
               </Button>
             </TableHead>
-            <TableHead>Shop Hours</TableHead>
+            <TableHead>Millwork</TableHead>
+            <TableHead>Box Constr.</TableHead>
             <TableHead>Stain Hours</TableHead>
             <TableHead>Install Hours</TableHead>
             <TableHead>Actions</TableHead>
@@ -162,9 +163,10 @@ const ProjectListView = ({ projects, onEdit, onDelete }: ProjectListViewProps) =
               </TableCell>
               <TableCell>{formatDate(project.installDate)}</TableCell>
               <TableCell className="font-medium">
-                {project.shopHrs + project.stainHrs + project.installHrs}
+                {project.millworkHrs + project.boxConstructionHrs + project.stainHrs + project.installHrs}
               </TableCell>
-              <TableCell>{project.shopHrs}</TableCell>
+              <TableCell>{project.millworkHrs}</TableCell>
+              <TableCell>{project.boxConstructionHrs}</TableCell>
               <TableCell>{project.stainHrs}</TableCell>
               <TableCell>{project.installHrs}</TableCell>
               <TableCell>

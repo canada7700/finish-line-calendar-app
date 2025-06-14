@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Project, ProjectPhase } from '../types/project';
 import { ProjectScheduler } from '../utils/projectScheduler';
@@ -108,7 +107,8 @@ const Dashboard = () => {
           console.log(`📅 Recalculating dates for project: ${project.jobName}`);
           console.log('📅 Original dates:', {
             install: project.installDate,
-            shopStart: project.shopStartDate,
+            millworkStart: project.millworkStartDate,
+            boxStart: project.boxConstructionStartDate,
             stainStart: project.stainStartDate,
             stainEnd: project.stainLacquerDate
           });
@@ -118,7 +118,8 @@ const Dashboard = () => {
           
           console.log('📅 Recalculated dates:', {
             install: recalculatedProject.installDate,
-            shopStart: recalculatedProject.shopStartDate,
+            millworkStart: recalculatedProject.millworkStartDate,
+            boxStart: recalculatedProject.boxConstructionStartDate,
             stainStart: recalculatedProject.stainStartDate,
             stainEnd: recalculatedProject.stainLacquerDate
           });
