@@ -3,7 +3,8 @@ export interface Project {
   id: string;
   jobName: string;
   jobDescription: string;
-  shopHrs: number;
+  millworkHrs: number;
+  boxConstructionHrs: number;
   stainHrs: number;
   installHrs: number;
   installDate: string;
@@ -11,7 +12,8 @@ export interface Project {
   boxToekickAssemblyDate?: string;
   millingFillersDate?: string;
   stainLacquerDate?: string;
-  shopStartDate?: string;
+  millworkStartDate?: string;
+  boxConstructionStartDate?: string;
   stainStartDate?: string;
   status: 'planning' | 'shop' | 'stain' | 'install' | 'completed';
 }
@@ -20,7 +22,7 @@ export interface ProjectPhase {
   id: string;
   projectId: string;
   projectName: string;
-  phase: 'shop' | 'stain' | 'install' | 'materialOrder';
+  phase: 'materialOrder' | 'millwork' | 'boxConstruction' | 'stain' | 'install';
   startDate: string;
   endDate: string;
   hours: number;

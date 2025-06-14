@@ -24,7 +24,8 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false, projectToEdit =
   const [formData, setFormData] = useState({
     jobName: '',
     jobDescription: '',
-    shopHrs: 0,
+    millworkHrs: 0,
+    boxConstructionHrs: 0,
     stainHrs: 0,
     installHrs: 0,
   });
@@ -38,7 +39,8 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false, projectToEdit =
       setFormData({
         jobName: projectToEdit.jobName,
         jobDescription: projectToEdit.jobDescription,
-        shopHrs: projectToEdit.shopHrs,
+        millworkHrs: projectToEdit.millworkHrs,
+        boxConstructionHrs: projectToEdit.boxConstructionHrs,
         stainHrs: projectToEdit.stainHrs,
         installHrs: projectToEdit.installHrs,
       });
@@ -55,7 +57,8 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false, projectToEdit =
       setFormData({
         jobName: '',
         jobDescription: '',
-        shopHrs: 0,
+        millworkHrs: 0,
+        boxConstructionHrs: 0,
         stainHrs: 0,
         installHrs: 0,
       });
@@ -148,19 +151,34 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false, projectToEdit =
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="shopHrs">Shop Hours</Label>
+              <Label htmlFor="millworkHrs">Millwork Hours</Label>
               <Input
-                id="shopHrs"
+                id="millworkHrs"
                 type="number"
                 min="0"
-                value={formData.shopHrs}
-                onChange={(e) => handleInputChange('shopHrs', parseInt(e.target.value) || 0)}
-                placeholder="183"
+                value={formData.millworkHrs}
+                onChange={(e) => handleInputChange('millworkHrs', parseInt(e.target.value) || 0)}
+                placeholder="e.g., 90"
                 disabled={isSubmitting}
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="boxConstructionHrs">Box Construction Hours</Label>
+              <Input
+                id="boxConstructionHrs"
+                type="number"
+                min="0"
+                value={formData.boxConstructionHrs}
+                onChange={(e) => handleInputChange('boxConstructionHrs', parseInt(e.target.value) || 0)}
+                placeholder="e.g., 93"
+                disabled={isSubmitting}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="stainHrs">Stain Hours</Label>
               <Input

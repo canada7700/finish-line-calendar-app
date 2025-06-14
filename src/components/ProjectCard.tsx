@@ -1,4 +1,3 @@
-
 import { Project } from '../types/project';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -24,7 +23,7 @@ const ProjectCard = ({ project, onEdit, onDelete }: ProjectCardProps) => {
     }
   };
 
-  const totalHours = project.shopHrs + project.stainHrs + project.installHrs;
+  const totalHours = project.millworkHrs + project.boxConstructionHrs + project.stainHrs + project.installHrs;
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent card click when delete button is clicked
@@ -58,10 +57,14 @@ const ProjectCard = ({ project, onEdit, onDelete }: ProjectCardProps) => {
         <p className="text-sm text-gray-600">{project.jobDescription}</p>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="grid grid-cols-3 gap-4 text-sm">
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="flex items-center gap-2">
+            <Hammer className="h-4 w-4 text-purple-600" />
+            <span>{project.millworkHrs}h Millwork</span>
+          </div>
           <div className="flex items-center gap-2">
             <Hammer className="h-4 w-4 text-blue-600" />
-            <span>{project.shopHrs}h Shop</span>
+            <span>{project.boxConstructionHrs}h Box</span>
           </div>
           <div className="flex items-center gap-2">
             <Paintbrush className="h-4 w-4 text-amber-600" />

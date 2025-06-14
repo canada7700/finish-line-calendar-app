@@ -1,4 +1,3 @@
-
 import { Project, ProjectPhase } from '../types/project';
 import { addDays, subDays, format, isWeekend, parseISO, eachDayOfInterval } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -220,21 +219,28 @@ export class ProjectScheduler {
     // Calculate duration in business days
     const installDuration = Math.ceil(project.installHrs / shopHours);
     const stainDuration = Math.ceil(project.stainHrs / stainHours);
-    const shopDuration = Math.ceil(project.shopHrs / shopHours);
+    const millworkDuration = Math.ceil(project.millworkHrs / shopHours);
+    const boxConstructionDuration = Math.ceil(project.boxConstructionHrs / shopHours);
     
-    console.log('📊 Project durations in business days:', { installDuration, stainDuration, shopDuration });
+    console.log('📊 Project durations in business days:', { installDuration, stainDuration, millworkDuration, boxConstructionDuration });
     
     // Stain must complete before install (1 business day buffer)
     const stainEndDate = this.getPreviousWorkingDay(finalInstallDate);
     const stainStartDate = this.subtractBusinessDays(stainEndDate, stainDuration - 1);
     
-    // Shop must complete before stain (1 business day buffer)
-    const shopEndDate = this.getPreviousWorkingDay(stainStartDate);
-    const shopStartDate = this.subtractBusinessDays(shopEndDate, shopDuration - 1);
+    // Millwork must complete before stain (1 business day buffer)
+    const millworkEndDate = this.getPreviousWorkingDay(stainStartDate);
+    const millworkStartDate = this.subtractBusinessDays(millworkEndDate, millworkDuration - 1);
     
+    // Box construction must complete before install (3 business day buffer)
+    const boxConstructionEndDate = this.subtractBusinessDays(finalInstallDate, 3);
+    const boxConstructionStartDate = this.subtractBusinessDays(boxConstructionEndDate, boxConstructionDuration - 1);
+
     const calculatedDates = {
-      shopStart: format(shopStartDate, 'yyyy-MM-dd'),
-      shopEnd: format(shopEndDate, 'yyyy-MM-dd'),
+      millworkStart: format(millworkStartDate, 'yyyy-MM-dd'),
+      millworkEnd: format(millworkEndDate, 'yyyy-MM-dd'),
+      boxConstructionStart: format(boxConstructionStartDate, 'yyyy-MM-dd'),
+      boxConstructionEnd: format(boxConstructionEndDate, 'yyyy-MM-dd'),
       stainStart: format(stainStartDate, 'yyyy-MM-dd'),
       stainEnd: format(stainEndDate, 'yyyy-MM-dd'),
       install: format(finalInstallDate, 'yyyy-MM-dd'),
@@ -247,9 +253,12 @@ export class ProjectScheduler {
       ...project,
       installDate: calculatedDates.install, // Update install date if it was adjusted
       materialOrderDate: calculatedDates.materialOrder,
-      shopStartDate: calculatedDates.shopStart,
+      millworkStartDate: calculatedDates.millworkStart,
+      boxConstructionStartDate: calculatedDates.boxConstructionStart,
       stainStartDate: calculatedDates.stainStart,
       stainLacquerDate: calculatedDates.stainEnd,
+      millingFillersDate: calculatedDates.millworkEnd,
+      boxToekickAssemblyDate: calculatedDates.boxConstructionEnd,
     };
   }
   
@@ -278,52 +287,79 @@ export class ProjectScheduler {
       console.log(`✅ Created material order phase for ${calculatedProject.materialOrderDate}`);
     }
 
-    // Shop phase - create individual phases for each working day
-    if (calculatedProject.shopStartDate) {
-      // Parse as local time to avoid timezone shift
-      const shopStartDate = new Date(`${calculatedProject.shopStartDate}T00:00:00`);
-      const shopDuration = Math.ceil(project.shopHrs / shopHours);
+    // Millwork phase - create individual phases for each working day
+    if (calculatedProject.millworkStartDate) {
+      const millworkStartDate = new Date(`${calculatedProject.millworkStartDate}T00:00:00`);
+      const millworkDuration = Math.ceil(project.millworkHrs / shopHours);
       
-      console.log(`🔨 Generating shop phases for ${shopDuration} working days starting ${format(shopStartDate, 'yyyy-MM-dd')}`);
+      console.log(`🔨 Generating millwork phases for ${millworkDuration} working days starting ${format(millworkStartDate, 'yyyy-MM-dd')}`);
       
-      let currentDate = new Date(shopStartDate);
-      const hoursPerDay = Math.ceil(project.shopHrs / shopDuration);
+      let currentDate = new Date(millworkStartDate);
+      const hoursPerDay = millworkDuration > 0 ? Math.ceil(project.millworkHrs / millworkDuration) : 0;
       
-      for (let day = 0; day < shopDuration; day++) {
-        // Find the next working day
+      for (let day = 0; day < millworkDuration; day++) {
         while (!this.isWorkingDay(currentDate)) {
           currentDate = addDays(currentDate, 1);
         }
         
         phases.push({
-          id: `${project.id}-shop-${day}`,
+          id: `${project.id}-millwork-${day}`,
           projectId: project.id,
           projectName: project.jobName,
-          phase: 'shop',
+          phase: 'millwork',
           startDate: format(currentDate, 'yyyy-MM-dd'),
-          endDate: format(currentDate, 'yyyy-MM-dd'), // Single day phase
+          endDate: format(currentDate, 'yyyy-MM-dd'),
+          hours: hoursPerDay,
+          color: 'bg-purple-500'
+        });
+        
+        console.log(`✅ Created millwork phase for ${format(currentDate, 'yyyy-MM-dd')}`);
+        currentDate = this.getNextWorkingDay(currentDate);
+      }
+    }
+
+    // Box Construction phase - create individual phases for each working day
+    if (calculatedProject.boxConstructionStartDate) {
+      const boxConstructionStartDate = new Date(`${calculatedProject.boxConstructionStartDate}T00:00:00`);
+      const boxConstructionDuration = Math.ceil(project.boxConstructionHrs / shopHours);
+      
+      console.log(`🔨 Generating box construction phases for ${boxConstructionDuration} working days starting ${format(boxConstructionStartDate, 'yyyy-MM-dd')}`);
+      
+      let currentDate = new Date(boxConstructionStartDate);
+      const hoursPerDay = boxConstructionDuration > 0 ? Math.ceil(project.boxConstructionHrs / boxConstructionDuration) : 0;
+      
+      for (let day = 0; day < boxConstructionDuration; day++) {
+        while (!this.isWorkingDay(currentDate)) {
+          currentDate = addDays(currentDate, 1);
+        }
+        
+        phases.push({
+          id: `${project.id}-box-${day}`,
+          projectId: project.id,
+          projectName: project.jobName,
+          phase: 'boxConstruction',
+          startDate: format(currentDate, 'yyyy-MM-dd'),
+          endDate: format(currentDate, 'yyyy-MM-dd'),
           hours: hoursPerDay,
           color: 'bg-blue-500'
         });
         
-        console.log(`✅ Created shop phase for ${format(currentDate, 'yyyy-MM-dd')}`);
+        console.log(`✅ Created box construction phase for ${format(currentDate, 'yyyy-MM-dd')}`);
         currentDate = this.getNextWorkingDay(currentDate);
       }
     }
     
     // Stain phase - create individual phases for each working day
     if (calculatedProject.stainStartDate) {
-      // Parse as local time to avoid timezone shift
       const stainStartDate = new Date(`${calculatedProject.stainStartDate}T00:00:00`);
       const stainDuration = Math.ceil(project.stainHrs / stainHours);
       
       console.log(`🎨 Generating stain phases for ${stainDuration} working days starting ${format(stainStartDate, 'yyyy-MM-dd')}`);
       
       let currentDate = new Date(stainStartDate);
-      const hoursPerDay = Math.ceil(project.stainHrs / stainDuration);
+      const hoursPerDay = stainDuration > 0 ? Math.ceil(project.stainHrs / stainDuration) : 0;
       
       for (let day = 0; day < stainDuration; day++) {
-        // Find the next working day
         while (!this.isWorkingDay(currentDate)) {
           currentDate = addDays(currentDate, 1);
         }
@@ -345,17 +381,15 @@ export class ProjectScheduler {
     }
     
     // Install phase - create individual phases for each working day
-    // Parse as local time to avoid timezone shift
     const installStartDate = new Date(`${calculatedProject.installDate}T00:00:00`);
     const installDuration = Math.ceil(project.installHrs / shopHours);
     
     console.log(`🔧 Generating install phases for ${installDuration} working days starting ${format(installStartDate, 'yyyy-MM-dd')}`);
     
     let currentDate = new Date(installStartDate);
-    const hoursPerDay = Math.ceil(project.installHrs / installDuration);
+    const hoursPerDay = installDuration > 0 ? Math.ceil(project.installHrs / installDuration) : 0;
     
     for (let day = 0; day < installDuration; day++) {
-      // Find the next working day
       while (!this.isWorkingDay(currentDate)) {
         currentDate = addDays(currentDate, 1);
       }

@@ -83,6 +83,8 @@ export type Database = {
       }
       projects: {
         Row: {
+          box_construction_hrs: number
+          box_construction_start_date: string | null
           box_toekick_assembly_date: string | null
           created_at: string
           id: string
@@ -92,8 +94,8 @@ export type Database = {
           job_name: string
           material_order_date: string | null
           milling_fillers_date: string | null
-          shop_hrs: number
-          shop_start_date: string | null
+          millwork_hrs: number
+          millwork_start_date: string | null
           stain_hrs: number
           stain_lacquer_date: string | null
           stain_start_date: string | null
@@ -101,6 +103,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          box_construction_hrs?: number
+          box_construction_start_date?: string | null
           box_toekick_assembly_date?: string | null
           created_at?: string
           id?: string
@@ -110,8 +114,8 @@ export type Database = {
           job_name: string
           material_order_date?: string | null
           milling_fillers_date?: string | null
-          shop_hrs?: number
-          shop_start_date?: string | null
+          millwork_hrs?: number
+          millwork_start_date?: string | null
           stain_hrs?: number
           stain_lacquer_date?: string | null
           stain_start_date?: string | null
@@ -119,6 +123,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          box_construction_hrs?: number
+          box_construction_start_date?: string | null
           box_toekick_assembly_date?: string | null
           created_at?: string
           id?: string
@@ -128,8 +134,8 @@ export type Database = {
           job_name?: string
           material_order_date?: string | null
           milling_fillers_date?: string | null
-          shop_hrs?: number
-          shop_start_date?: string | null
+          millwork_hrs?: number
+          millwork_start_date?: string | null
           stain_hrs?: number
           stain_lacquer_date?: string | null
           stain_start_date?: string | null

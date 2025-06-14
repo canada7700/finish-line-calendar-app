@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,7 +29,8 @@ export const useProjects = () => {
         id: project.id,
         jobName: project.job_name,
         jobDescription: project.job_description,
-        shopHrs: project.shop_hrs,
+        millworkHrs: project.millwork_hrs,
+        boxConstructionHrs: project.box_construction_hrs,
         stainHrs: project.stain_hrs,
         installHrs: project.install_hrs,
         installDate: project.install_date,
@@ -38,7 +38,8 @@ export const useProjects = () => {
         boxToekickAssemblyDate: project.box_toekick_assembly_date,
         millingFillersDate: project.milling_fillers_date,
         stainLacquerDate: project.stain_lacquer_date,
-        shopStartDate: project.shop_start_date,
+        millworkStartDate: project.millwork_start_date,
+        boxConstructionStartDate: project.box_construction_start_date,
         stainStartDate: project.stain_start_date,
         status: project.status as Project['status']
       })) as Project[];
@@ -54,7 +55,8 @@ export const useProjects = () => {
         .insert({
           job_name: projectData.jobName,
           job_description: projectData.jobDescription,
-          shop_hrs: projectData.shopHrs,
+          millwork_hrs: projectData.millworkHrs,
+          box_construction_hrs: projectData.boxConstructionHrs,
           stain_hrs: projectData.stainHrs,
           install_hrs: projectData.installHrs,
           install_date: projectData.installDate,
@@ -62,7 +64,8 @@ export const useProjects = () => {
           box_toekick_assembly_date: projectData.boxToekickAssemblyDate,
           milling_fillers_date: projectData.millingFillersDate,
           stain_lacquer_date: projectData.stainLacquerDate,
-          shop_start_date: projectData.shopStartDate,
+          millwork_start_date: projectData.millworkStartDate,
+          box_construction_start_date: projectData.boxConstructionStartDate,
           stain_start_date: projectData.stainStartDate,
           status: projectData.status
         })
@@ -103,7 +106,8 @@ export const useProjects = () => {
         .update({
           job_name: project.jobName,
           job_description: project.jobDescription,
-          shop_hrs: project.shopHrs,
+          millwork_hrs: project.millworkHrs,
+          box_construction_hrs: project.boxConstructionHrs,
           stain_hrs: project.stainHrs,
           install_hrs: project.installHrs,
           install_date: project.installDate,
@@ -111,7 +115,8 @@ export const useProjects = () => {
           box_toekick_assembly_date: project.boxToekickAssemblyDate,
           milling_fillers_date: project.millingFillersDate,
           stain_lacquer_date: project.stainLacquerDate,
-          shop_start_date: project.shopStartDate,
+          millwork_start_date: project.millworkStartDate,
+          box_construction_start_date: project.boxConstructionStartDate,
           stain_start_date: project.stainStartDate,
           status: project.status
         })
