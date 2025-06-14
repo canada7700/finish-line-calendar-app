@@ -10,9 +10,11 @@ import ProjectForm from "@/components/ProjectForm";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Project } from "@/types/project";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ProjectScheduler } from "@/utils/projectScheduler";
+import { toast } from "@/hooks/use-toast";
 
 const ProjectsPage = () => {
-  const { projects, isLoading, addProject, updateProject, deleteProject } = useProjects();
+  const { projects, isLoading, addProject, updateProject, deleteProject, isAddingProject, isUpdatingProject } = useProjects();
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
 
@@ -33,6 +35,33 @@ const ProjectsPage = () => {
   const handleFormClose = () => {
     setIsFormOpen(false);
     setSelectedProject(null);
+  };
+
+  const handleFormSubmit = async (projectData: Omit<Project, 'id'> | Project) => {
+    const isEditing = 'id' in projectData;
+    handleFormClose();
+
+    try {
+      const calculatedProject = await ProjectScheduler.calculateProjectDates(projectData as Project);
+
+      if (isEditing) {
+        updateProject(calculatedProject, {
+          onSuccess: () => {
+            toast({ title: "Project Updated", description: "Project has been updated successfully." });
+          },
+          onError: (error) => {
+            toast({ title: "Update Failed", description: `Could not update project: ${error.message}`, variant: "destructive" });
+          }
+        });
+      } else {
+        const { id, ...projectWithoutId } = calculatedProject;
+        // The addProject mutation from useProjects handles its own success/error toasts.
+        addProject(projectWithoutId);
+      }
+    } catch (error) {
+      console.error("Error submitting form", error);
+      toast({ title: "Error", description: `An error occurred during date calculation.`, variant: "destructive" });
+    }
   };
 
   return (
@@ -82,16 +111,10 @@ const ProjectsPage = () => {
             <DialogTitle>{selectedProject ? "Edit Project" : "Add New Project"}</DialogTitle>
           </DialogHeader>
           <ProjectForm
-            project={selectedProject}
-            onSubmit={async (values) => {
-              if (selectedProject) {
-                updateProject({ ...selectedProject, ...values });
-              } else {
-                addProject(values as Omit<Project, "id">);
-              }
-              handleFormClose();
-            }}
+            projectToEdit={selectedProject}
+            onSubmit={handleFormSubmit}
             onCancel={handleFormClose}
+            isSubmitting={isAddingProject || isUpdatingProject}
           />
         </DialogContent>
       </Dialog>

@@ -1,9 +1,10 @@
+
 import { useState, useEffect } from 'react';
 import { Project, ProjectPhase } from '../types/project';
 import { ProjectScheduler } from '../utils/projectScheduler';
 import ProjectCard from './ProjectCard';
 import ProjectForm from './ProjectForm';
-import CalendarView from './CalendarView';
+import { CalendarView } from './CalendarView';
 import ProjectListView from './ProjectListView';
 import TeamWorkloadOverview from './TeamWorkloadOverview';
 import { Button } from '@/components/ui/button';
