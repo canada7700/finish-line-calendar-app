@@ -81,6 +81,73 @@ export type Database = {
           },
         ]
       }
+      project_notes: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          note: string | null
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          note?: string | null
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          note?: string | null
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_notes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_phase_exceptions: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          phase: string
+          project_id: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          phase: string
+          project_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          phase?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_phase_exceptions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           box_construction_hrs: number
