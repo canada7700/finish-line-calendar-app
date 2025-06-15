@@ -4,18 +4,20 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Users, Clock } from 'lucide-react';
 import { useTeamMembers } from '../hooks/useTeamMembers';
-import { useProjectAssignments } from '../hooks/useProjectAssignments';
+import { useAllProjectAssignments } from '../hooks/useProjectAssignments';
+import { Skeleton } from './ui/skeleton';
 
 const TeamWorkloadOverview = () => {
-  const { teamMembers } = useTeamMembers();
-  const { assignments } = useProjectAssignments();
+  const { teamMembers, isLoading: isLoadingTeamMembers } = useTeamMembers();
+  const { data: assignments, isLoading: isLoadingAssignments } = useAllProjectAssignments();
 
   const calculateMemberWorkload = (memberId: string, weeklyHours: number) => {
+    if (!assignments) return { totalAssignedHours: 0, utilizationPercentage: 0, assignmentCount: 0 };
+    
     const memberAssignments = assignments.filter(assignment => assignment.teamMemberId === memberId);
     const totalAssignedHours = memberAssignments.reduce((sum, assignment) => sum + assignment.assignedHours, 0);
     
-    // Rough calculation assuming assignments are spread over weeks
-    const utilizationPercentage = Math.min((totalAssignedHours / weeklyHours) * 100, 100);
+    const utilizationPercentage = weeklyHours > 0 ? Math.min((totalAssignedHours / weeklyHours) * 100, 100) : 0;
     
     return {
       totalAssignedHours,
@@ -36,7 +38,34 @@ const TeamWorkloadOverview = () => {
     return { variant: 'destructive' as const, label: 'Overloaded' };
   };
 
-  if (teamMembers.length === 0) {
+  const isLoading = isLoadingTeamMembers || isLoadingAssignments;
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            Team Workload Overview
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-2 w-full" />
+            <Skeleton className="h-3 w-3/4" />
+          </div>
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-2 w-full" />
+            <Skeleton className="h-3 w-3/4" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!teamMembers || teamMembers.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -46,7 +75,7 @@ const TeamWorkloadOverview = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">No team members found. Add team members in Settings to see workload overview.</p>
+          <p className="text-sm text-muted-foreground">No team members found. Add team members to see workload overview.</p>
         </CardContent>
       </Card>
     );
@@ -90,7 +119,7 @@ const TeamWorkloadOverview = () => {
                   {workload.totalAssignedHours}h assigned / {member.weeklyHours}h capacity
                 </div>
                 <div>
-                  {workload.assignmentCount} project{workload.assignmentCount !== 1 ? 's' : ''}
+                  {workload.assignmentCount} project assignment{workload.assignmentCount !== 1 ? 's' : ''}
                 </div>
               </div>
             </div>

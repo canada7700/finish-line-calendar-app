@@ -1,5 +1,6 @@
 
 import TeamMemberManager from '../components/TeamMemberManager';
+import TeamWorkloadOverview from '../components/TeamWorkloadOverview';
 
 const Team = () => {
   return (
@@ -11,7 +12,8 @@ const Team = () => {
             Manage your team members and their work capacity for project assignments.
           </p>
         </div>
-
+        
+        <TeamWorkloadOverview />
         <TeamMemberManager />
       </div>
     </div>

@@ -49,8 +49,55 @@ export const useProjectAssignments = ({ projectId }: { projectId: string }) => {
         endDate: d.end_date,
         createdAt: d.created_at,
         updatedAt: d.updated_at,
-        teamMember: d.team_members,
-        project: d.projects,
+        teamMember: d.team_members ? {
+          id: d.team_members.id,
+          name: d.team_members.name,
+        } : undefined,
+        project: d.projects ? {
+          id: d.projects.id,
+          jobName: d.projects.job_name,
+        } : undefined,
+      }));
+    },
+  });
+};
+
+export const useAllProjectAssignments = () => {
+  return useQuery<ProjectAssignment[], Error>({
+    queryKey: ['project-assignments-all'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('project_assignments')
+        .select(`
+          *,
+          team_members (id, name),
+          projects (id, job_name)
+        `);
+
+      if (error) {
+        toast({ title: "Error fetching all assignments", description: error.message, variant: 'destructive' });
+        throw new Error(error.message);
+      }
+      
+      return data.map((d: any) => ({
+        id: d.id,
+        projectId: d.project_id,
+        teamMemberId: d.team_member_id,
+        phase: d.phase,
+        assignedHours: d.assigned_hours,
+        actualHours: d.actual_hours,
+        startDate: d.start_date,
+        endDate: d.end_date,
+        createdAt: d.created_at,
+        updatedAt: d.updated_at,
+        teamMember: d.team_members ? {
+            id: d.team_members.id,
+            name: d.team_members.name,
+        } : undefined,
+        project: d.projects ? {
+            id: d.projects.id,
+            jobName: d.projects.job_name,
+        } : undefined,
       }));
     },
   });
