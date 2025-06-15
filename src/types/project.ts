@@ -1,4 +1,3 @@
-
 export interface Project {
   id: string;
   jobName: string;
@@ -55,6 +54,8 @@ export interface ProjectAssignment {
   endDate?: string;
   createdAt: string;
   updatedAt: string;
+  teamMember?: TeamMember;
+  project?: Pick<Project, 'id' | 'jobName'>;
 }
 
 export interface ProjectNote {

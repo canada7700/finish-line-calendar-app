@@ -109,7 +109,7 @@ const PhaseManager: React.FC<PhaseManagerProps> = ({ phase, title, totalHours, p
 
 export const ProjectAssignmentManager = ({ project }: { project: Project }) => {
   const { teamMembers, isLoading: isLoadingTeamMembers } = useTeamMembers();
-  const { projectAssignments, isLoading: isLoadingAssignments } = useProjectAssignments({ projectId: project.id });
+  const { data: projectAssignments, isLoading: isLoadingAssignments } = useProjectAssignments({ projectId: project.id });
 
   const phases: { key: Phase; title: string; hours: number }[] = [
     { key: 'millwork', title: 'Millwork', hours: project.millworkHrs },
