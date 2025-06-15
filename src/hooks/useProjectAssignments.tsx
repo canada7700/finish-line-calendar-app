@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ProjectAssignment } from '../types/project';
@@ -22,8 +21,7 @@ export const useProjectAssignments = ({ projectId }: { projectId: string }) => {
           created_at,
           updated_at,
           team_members (
-            id,
-            name
+            *
           ),
           projects (
             id,
@@ -52,6 +50,15 @@ export const useProjectAssignments = ({ projectId }: { projectId: string }) => {
         teamMember: d.team_members ? {
           id: d.team_members.id,
           name: d.team_members.name,
+          email: d.team_members.email,
+          weeklyHours: d.team_members.weekly_hours,
+          hourlyRate: d.team_members.hourly_rate,
+          canDoShop: d.team_members.can_do_shop,
+          canDoStain: d.team_members.can_do_stain,
+          canDoInstall: d.team_members.can_do_install,
+          isActive: d.team_members.is_active,
+          createdAt: d.team_members.created_at,
+          updatedAt: d.team_members.updated_at,
         } : undefined,
         project: d.projects ? {
           id: d.projects.id,
@@ -70,7 +77,7 @@ export const useAllProjectAssignments = () => {
         .from('project_assignments')
         .select(`
           *,
-          team_members (id, name),
+          team_members (*),
           projects (id, job_name)
         `);
 
@@ -93,6 +100,15 @@ export const useAllProjectAssignments = () => {
         teamMember: d.team_members ? {
             id: d.team_members.id,
             name: d.team_members.name,
+            email: d.team_members.email,
+            weeklyHours: d.team_members.weekly_hours,
+            hourlyRate: d.team_members.hourly_rate,
+            canDoShop: d.team_members.can_do_shop,
+            canDoStain: d.team_members.can_do_stain,
+            canDoInstall: d.team_members.can_do_install,
+            isActive: d.team_members.is_active,
+            createdAt: d.team_members.created_at,
+            updatedAt: d.team_members.updated_at
         } : undefined,
         project: d.projects ? {
             id: d.projects.id,
