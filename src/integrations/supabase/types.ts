@@ -56,6 +56,7 @@ export type Database = {
       }
       project_assignments: {
         Row: {
+          actual_hours: number | null
           assigned_hours: number
           created_at: string
           end_date: string | null
@@ -67,6 +68,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          actual_hours?: number | null
           assigned_hours?: number
           created_at?: string
           end_date?: string | null
@@ -78,6 +80,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          actual_hours?: number | null
           assigned_hours?: number
           created_at?: string
           end_date?: string | null

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Project } from '../types/project';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +11,8 @@ import { CalendarIcon, AlertTriangle } from 'lucide-react';
 import { format, isWeekend, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ProjectScheduler } from '../utils/projectScheduler';
+import { Separator } from '@/components/ui/separator';
+import { ProjectAssignmentManager } from './ProjectAssignmentManager';
 
 interface ProjectFormProps {
   onSubmit: (project: Omit<Project, 'id'> | Project) => void;
@@ -264,6 +267,13 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false, projectToEdit =
             </Button>
           </div>
         </form>
+
+        {isEditing && projectToEdit && (
+          <>
+            <Separator className="my-6" />
+            <ProjectAssignmentManager project={projectToEdit} />
+          </>
+        )}
       </CardContent>
     </Card>
   );

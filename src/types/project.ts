@@ -48,8 +48,9 @@ export interface ProjectAssignment {
   id: string;
   projectId: string;
   teamMemberId: string;
-  phase: 'shop' | 'stain' | 'install';
+  phase: 'millwork' | 'boxConstruction' | 'stain' | 'install';
   assignedHours: number;
+  actualHours?: number | null;
   startDate?: string;
   endDate?: string;
   createdAt: string;
