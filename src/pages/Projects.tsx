@@ -106,7 +106,7 @@ const ProjectsPage = () => {
       </Tabs>
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{selectedProject ? "Edit Project" : "Add New Project"}</DialogTitle>
           </DialogHeader>
