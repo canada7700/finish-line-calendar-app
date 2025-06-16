@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Project } from '../types/project';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -161,6 +162,7 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false, projectToEdit =
                   onChange={(e) => handleInputChange('millworkHrs', parseInt(e.target.value) || 0)}
                   placeholder="e.g., 90"
                   disabled={isSubmitting}
+                  className="bg-blue-50 border-blue-200 focus:bg-blue-50"
                 />
               </div>
               <div className="space-y-2">
@@ -173,6 +175,7 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false, projectToEdit =
                   onChange={(e) => handleInputChange('boxConstructionHrs', parseInt(e.target.value) || 0)}
                   placeholder="e.g., 93"
                   disabled={isSubmitting}
+                  className="bg-green-50 border-green-200 focus:bg-green-50"
                 />
               </div>
             </div>
@@ -188,6 +191,7 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false, projectToEdit =
                   onChange={(e) => handleInputChange('stainHrs', parseInt(e.target.value) || 0)}
                   placeholder="80"
                   disabled={isSubmitting}
+                  className="bg-orange-50 border-orange-200 focus:bg-orange-50"
                 />
               </div>
               <div className="space-y-2">
@@ -200,6 +204,7 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false, projectToEdit =
                   onChange={(e) => handleInputChange('installHrs', parseInt(e.target.value) || 0)}
                   placeholder="102"
                   disabled={isSubmitting}
+                  className="bg-purple-50 border-purple-200 focus:bg-purple-50"
                 />
               </div>
             </div>
