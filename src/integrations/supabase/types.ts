@@ -264,8 +264,9 @@ export type Database = {
       }
       team_members: {
         Row: {
+          can_do_boxes: boolean
           can_do_install: boolean
-          can_do_shop: boolean
+          can_do_millwork: boolean
           can_do_stain: boolean
           created_at: string
           email: string | null
@@ -277,8 +278,9 @@ export type Database = {
           weekly_hours: number
         }
         Insert: {
+          can_do_boxes?: boolean
           can_do_install?: boolean
-          can_do_shop?: boolean
+          can_do_millwork?: boolean
           can_do_stain?: boolean
           created_at?: string
           email?: string | null
@@ -290,8 +292,9 @@ export type Database = {
           weekly_hours?: number
         }
         Update: {
+          can_do_boxes?: boolean
           can_do_install?: boolean
-          can_do_shop?: boolean
+          can_do_millwork?: boolean
           can_do_stain?: boolean
           created_at?: string
           email?: string | null

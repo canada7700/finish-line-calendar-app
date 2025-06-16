@@ -35,7 +35,8 @@ export interface TeamMember {
   email?: string;
   weeklyHours: number;
   hourlyRate?: number;
-  canDoShop: boolean;
+  canDoMillwork: boolean;
+  canDoBoxes: boolean;
   canDoStain: boolean;
   canDoInstall: boolean;
   isActive: boolean;

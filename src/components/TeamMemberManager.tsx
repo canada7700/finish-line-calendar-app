@@ -11,7 +11,11 @@ import { useTeamMembers } from '../hooks/useTeamMembers';
 import { TeamMember } from '../types/project';
 
 const SKILL_COLORS = {
-  shop: {
+  millwork: {
+    base: 'bg-purple-500 text-white hover:bg-purple-500/90 border-transparent',
+    switch: 'data-[state=checked]:bg-purple-500',
+  },
+  boxes: {
     base: 'bg-blue-500 text-white hover:bg-blue-500/90 border-transparent',
     switch: 'data-[state=checked]:bg-blue-500',
   },
@@ -35,7 +39,8 @@ const TeamMemberManager = () => {
     email: '',
     weeklyHours: 40,
     hourlyRate: 0,
-    canDoShop: true,
+    canDoMillwork: true,
+    canDoBoxes: true,
     canDoStain: true,
     canDoInstall: true
   });
@@ -46,7 +51,8 @@ const TeamMemberManager = () => {
       email: '',
       weeklyHours: 40,
       hourlyRate: 0,
-      canDoShop: true,
+      canDoMillwork: true,
+      canDoBoxes: true,
       canDoStain: true,
       canDoInstall: true
     });
@@ -81,7 +87,8 @@ const TeamMemberManager = () => {
       email: member.email || '',
       weeklyHours: member.weeklyHours,
       hourlyRate: member.hourlyRate || 0,
-      canDoShop: member.canDoShop,
+      canDoMillwork: member.canDoMillwork,
+      canDoBoxes: member.canDoBoxes,
       canDoStain: member.canDoStain,
       canDoInstall: member.canDoInstall
     });
@@ -97,7 +104,8 @@ const TeamMemberManager = () => {
 
   const getSkillBadges = (member: TeamMember) => {
     const skills: {name: string, className: string}[] = [];
-    if (member.canDoShop) skills.push({ name: 'Shop', className: SKILL_COLORS.shop.base });
+    if (member.canDoMillwork) skills.push({ name: 'Millwork', className: SKILL_COLORS.millwork.base });
+    if (member.canDoBoxes) skills.push({ name: 'Boxes', className: SKILL_COLORS.boxes.base });
     if (member.canDoStain) skills.push({ name: 'Stain', className: SKILL_COLORS.stain.base });
     if (member.canDoInstall) skills.push({ name: 'Install', className: SKILL_COLORS.install.base });
     return skills;
@@ -183,15 +191,24 @@ const TeamMemberManager = () => {
 
                 <div className="space-y-3">
                   <Label>Skills & Capabilities</Label>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="flex items-center space-x-2">
                       <Switch
-                        id="canDoShop"
-                        checked={formData.canDoShop}
-                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, canDoShop: checked }))}
-                        className={SKILL_COLORS.shop.switch}
+                        id="canDoMillwork"
+                        checked={formData.canDoMillwork}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, canDoMillwork: checked }))}
+                        className={SKILL_COLORS.millwork.switch}
                       />
-                      <Label htmlFor="canDoShop">Shop Work</Label>
+                      <Label htmlFor="canDoMillwork">Millwork</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="canDoBoxes"
+                        checked={formData.canDoBoxes}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, canDoBoxes: checked }))}
+                        className={SKILL_COLORS.boxes.switch}
+                      />
+                      <Label htmlFor="canDoBoxes">Box Construction</Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Switch
