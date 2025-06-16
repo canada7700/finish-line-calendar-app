@@ -30,11 +30,11 @@ export const AssignmentTable: React.FC<AssignmentTableProps> = ({
 
   const [newAssignments, setNewAssignments] = React.useState<{ [key: string]: { memberId: string; hours: number } }>({});
 
-  const phases: { key: Phase; title: string; hours: number }[] = [
-    { key: 'millwork', title: 'Millwork', hours: project.millworkHrs },
-    { key: 'boxConstruction', title: 'Box Construction', hours: project.boxConstructionHrs },
-    { key: 'stain', title: 'Stain', hours: project.stainHrs },
-    { key: 'install', title: 'Install', hours: project.installHrs },
+  const phases: { key: Phase; title: string; hours: number; colorClass: string }[] = [
+    { key: 'millwork', title: 'Millwork', hours: project.millworkHrs, colorClass: 'bg-blue-50 border-blue-200' },
+    { key: 'boxConstruction', title: 'Box Construction', hours: project.boxConstructionHrs, colorClass: 'bg-green-50 border-green-200' },
+    { key: 'stain', title: 'Stain', hours: project.stainHrs, colorClass: 'bg-orange-50 border-orange-200' },
+    { key: 'install', title: 'Install', hours: project.installHrs, colorClass: 'bg-purple-50 border-purple-200' },
   ];
 
   const getPhaseAssignments = (phase: Phase) => {
@@ -98,7 +98,7 @@ export const AssignmentTable: React.FC<AssignmentTableProps> = ({
         const progressPercentage = phase.hours > 0 ? (assignedHours / phase.hours) * 100 : 0;
 
         return (
-          <div key={phase.key} className="border rounded-lg p-4 space-y-4">
+          <div key={phase.key} className={`border rounded-lg p-4 space-y-4 ${phase.colorClass}`}>
             <div className="flex items-center justify-between">
               <h4 className="text-lg font-semibold">{phase.title}</h4>
               <div className="text-sm text-muted-foreground">
