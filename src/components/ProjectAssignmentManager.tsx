@@ -14,13 +14,6 @@ export const ProjectAssignmentManager = ({ project }: { project: Project }) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xl font-semibold">Team Assignments</h3>
-        <div className="text-sm text-muted-foreground">
-          Assign team members to project phases
-        </div>
-      </div>
-      
       {isLoading ? (
         <div className="space-y-4">
           <Skeleton className="h-32 w-full" />
