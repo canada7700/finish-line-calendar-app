@@ -39,12 +39,12 @@ const ProjectsPage = () => {
 
   const handleFormSubmit = async (projectData: Omit<Project, 'id'> | Project) => {
     const isEditing = 'id' in projectData;
-    handleFormClose();
 
     try {
       const calculatedProject = await ProjectScheduler.calculateProjectDates(projectData as Project);
 
       if (isEditing) {
+        handleFormClose();
         updateProject(calculatedProject, {
           onSuccess: () => {
             toast({ title: "Project Updated", description: "Project has been updated successfully." });
@@ -55,8 +55,40 @@ const ProjectsPage = () => {
         });
       } else {
         const { id, ...projectWithoutId } = calculatedProject;
-        // The addProject mutation from useProjects handles its own success/error toasts.
-        addProject(projectWithoutId);
+        addProject(projectWithoutId, {
+          onSuccess: (newProject: any) => {
+            // Transform the returned data to match our Project interface
+            const createdProject: Project = {
+              id: newProject.id,
+              jobName: newProject.job_name,
+              jobDescription: newProject.job_description,
+              millworkHrs: newProject.millwork_hrs,
+              boxConstructionHrs: newProject.box_construction_hrs,
+              stainHrs: newProject.stain_hrs,
+              installHrs: newProject.install_hrs,
+              installDate: newProject.install_date,
+              materialOrderDate: newProject.material_order_date,
+              boxToekickAssemblyDate: newProject.box_toekick_assembly_date,
+              millingFillersDate: newProject.milling_fillers_date,
+              stainLacquerDate: newProject.stain_lacquer_date,
+              millworkStartDate: newProject.millwork_start_date,
+              boxConstructionStartDate: newProject.box_construction_start_date,
+              stainStartDate: newProject.stain_start_date,
+              status: newProject.status as Project['status']
+            };
+
+            // Automatically open edit mode to assign team members
+            setSelectedProject(createdProject);
+            toast({ 
+              title: "Project Created", 
+              description: "Project created successfully! Now you can assign team members to phases." 
+            });
+          },
+          onError: (error) => {
+            handleFormClose();
+            toast({ title: "Creation Failed", description: `Could not create project: ${error.message}`, variant: "destructive" });
+          }
+        });
       }
     } catch (error) {
       console.error("Error submitting form", error);

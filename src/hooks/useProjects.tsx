@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -182,9 +183,13 @@ export const useProjects = () => {
     projects,
     isLoading,
     error,
-    addProject: addProjectMutation.mutate,
+    addProject: (projectData: Omit<Project, 'id'>, options?: { onSuccess?: (data: any) => void; onError?: (error: any) => void }) => {
+      return addProjectMutation.mutate(projectData, options);
+    },
     isAddingProject: addProjectMutation.isPending,
-    updateProject: updateProjectMutation.mutate,
+    updateProject: (projectData: Project, options?: { onSuccess?: () => void; onError?: (error: any) => void }) => {
+      return updateProjectMutation.mutate(projectData, options);
+    },
     isUpdatingProject: updateProjectMutation.isPending,
     deleteProject: deleteProjectMutation.mutate,
     isDeletingProject: deleteProjectMutation.isPending

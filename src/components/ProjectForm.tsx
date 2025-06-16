@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, AlertTriangle } from 'lucide-react';
+import { CalendarIcon, AlertTriangle, Users } from 'lucide-react';
 import { format, isWeekend, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ProjectScheduler } from '../utils/projectScheduler';
@@ -273,14 +273,40 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false, projectToEdit =
           </CardContent>
         </Card>
 
-        {/* Right Column - Assignment Manager (only when editing) */}
-        {isEditing && projectToEdit && (
-          <Card className="border-0 shadow-none">
-            <CardContent className="pt-4 px-1">
+        {/* Right Column - Assignment Manager or Team Assignment Info */}
+        <Card className="border-0 shadow-none">
+          <CardContent className="pt-4 px-1">
+            {isEditing && projectToEdit ? (
               <ProjectAssignmentManager project={projectToEdit} />
-            </CardContent>
-          </Card>
-        )}
+            ) : (
+              <div className="space-y-6">
+                <div className="flex items-center gap-3">
+                  <Users className="h-6 w-6 text-blue-600" />
+                  <h3 className="text-xl font-semibold">Team Assignments</h3>
+                </div>
+                <div className="space-y-4">
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h4 className="font-medium text-blue-900 mb-2">Assign Team Members After Creation</h4>
+                    <p className="text-sm text-blue-800 mb-3">
+                      Once you create this project, you'll be able to assign team members to each phase:
+                    </p>
+                    <ul className="text-sm text-blue-700 space-y-1">
+                      <li>• <strong>Millwork</strong> ({formData.millworkHrs} hours)</li>
+                      <li>• <strong>Box Construction</strong> ({formData.boxConstructionHrs} hours)</li>
+                      <li>• <strong>Stain</strong> ({formData.stainHrs} hours)</li>
+                      <li>• <strong>Install</strong> ({formData.installHrs} hours)</li>
+                    </ul>
+                  </div>
+                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
+                    <p className="text-sm text-gray-600">
+                      💡 <strong>Tip:</strong> After clicking "Add Project", this dialog will automatically switch to edit mode where you can manage team assignments for each phase.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
