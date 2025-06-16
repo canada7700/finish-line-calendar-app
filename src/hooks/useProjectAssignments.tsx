@@ -161,12 +161,24 @@ export const useUpdateProjectAssignment = () => {
   return useMutation({
     mutationFn: async (assignmentData: Partial<ProjectAssignment> & { id: string }) => {
       const { id, ...updateData } = assignmentData;
+      const dbUpdateData: any = {};
+      
+      if (updateData.assignedHours !== undefined) {
+        dbUpdateData.assigned_hours = updateData.assignedHours;
+      }
+      if (updateData.actualHours !== undefined) {
+        dbUpdateData.actual_hours = updateData.actualHours;
+      }
+      if (updateData.startDate !== undefined) {
+        dbUpdateData.start_date = updateData.startDate;
+      }
+      if (updateData.endDate !== undefined) {
+        dbUpdateData.end_date = updateData.endDate;
+      }
+      
       const { data, error } = await supabase
         .from('project_assignments')
-        .update({
-          assigned_hours: updateData.assignedHours,
-          actual_hours: updateData.actualHours,
-        })
+        .update(dbUpdateData)
         .eq('id', id)
         .select()
         .single();
@@ -176,6 +188,7 @@ export const useUpdateProjectAssignment = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['project-assignments', data.project_id] });
+      queryClient.invalidateQueries({ queryKey: ['assignments-by-date-range'] });
       toast({
         title: "Assignment Updated",
         description: "Project assignment has been updated successfully.",
