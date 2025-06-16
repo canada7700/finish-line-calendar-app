@@ -1,3 +1,4 @@
+
 import { Project, ProjectPhase } from '../types/project';
 import { addDays, subDays, format, isWeekend, parseISO, eachDayOfInterval } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -214,7 +215,16 @@ export class ProjectScheduler {
     }
     
     // Material order date is 60 calendar days before install
-    const materialOrderDate = subDays(finalInstallDate, 60);
+    let materialOrderDate = subDays(finalInstallDate, 60);
+    
+    // Ensure material order date is on a working day - move to previous working day if needed
+    if (!this.isWorkingDay(materialOrderDate)) {
+      const originalMaterialOrderDate = format(materialOrderDate, 'yyyy-MM-dd');
+      materialOrderDate = this.getPreviousWorkingDay(materialOrderDate);
+      console.log(`📦 Material order date ${originalMaterialOrderDate} adjusted to previous working day: ${format(materialOrderDate, 'yyyy-MM-dd')}`);
+    } else {
+      console.log(`📦 Material order date ${format(materialOrderDate, 'yyyy-MM-dd')} is already a working day`);
+    }
 
     // Calculate duration in business days
     const installDuration = Math.ceil(project.installHrs / shopHours);
