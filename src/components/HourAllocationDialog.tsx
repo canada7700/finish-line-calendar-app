@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Trash2, Plus, AlertTriangle, Wand2, CheckSquare, Square, Users, Grid3X3, List, Loader2 } from 'lucide-react';
+import { Trash2, Plus, AlertTriangle, Wand2, CheckSquare, Square, Users, Grid3X3, List, Loader2, RefreshCw } from 'lucide-react';
 import { ProjectPhase } from '../types/project';
 import { useTeamMembers } from '../hooks/useTeamMembers';
 import { useAllProjectAssignments } from '../hooks/useProjectAssignments';
@@ -36,13 +36,22 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
 
   const { teamMembers, isLoading: isLoadingTeamMembers } = useTeamMembers();
   const { data: assignments } = useAllProjectAssignments();
-  const { data: allocations = [], isLoading: isLoadingAllocations } = useDailyHourAllocations(date);
-  const { data: capacities = [] } = useDailyPhaseCapacities();
+  const { data: allocations = [], isLoading: isLoadingAllocations, refetch: refetchAllocations } = useDailyHourAllocations(date);
+  const { data: capacities = [], isLoading: isLoadingCapacities, refetch: refetchCapacities } = useDailyPhaseCapacities();
   const addAllocationMutation = useAddHourAllocation();
   const addAllocationSilentMutation = useAddHourAllocationSilent();
   const removeAllocationMutation = useRemoveHourAllocation();
 
   const { capacityInfo, hasOverAllocation } = useDayCapacityInfo(date, allocations, capacities);
+
+  // Force refresh capacity data when dialog opens
+  React.useEffect(() => {
+    if (open) {
+      console.log('🔄 Dialog opened, refreshing capacity data...');
+      refetchCapacities();
+      refetchAllocations();
+    }
+  }, [open, refetchCapacities, refetchAllocations]);
 
   const availableProjects = React.useMemo(() => {
     return Array.from(new Map(phases.map(p => [p.projectId, { id: p.projectId, name: p.projectName }])).values());
@@ -133,6 +142,15 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
 
   const handleClearSelection = () => {
     setSelectedHourBlocks([]);
+  };
+
+  const handleRefreshCapacities = async () => {
+    console.log('🔄 Manually refreshing capacity data...');
+    await Promise.all([refetchCapacities(), refetchAllocations()]);
+    toast({
+      title: "Data Refreshed",
+      description: "Capacity and allocation data has been refreshed.",
+    });
   };
 
   const handleAutoFill = async () => {
@@ -285,7 +303,7 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
 
   if (!open) return null;
 
-  const isLoading = isLoadingTeamMembers || isLoadingAllocations;
+  const isLoading = isLoadingTeamMembers || isLoadingAllocations || isLoadingCapacities;
   const hourBlockOccupancy = getHourBlockOccupancy();
   const availableHourBlocks = getAvailableHourBlocks();
   const eligibleMembers = selectedPhase ? getEligibleTeamMembers(selectedPhase) : [];
@@ -294,7 +312,19 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[1200px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Hour Allocations for {format(date, 'MMMM d, yyyy')}</DialogTitle>
+          <DialogTitle className="flex items-center justify-between">
+            <span>Hour Allocations for {format(date, 'MMMM d, yyyy')}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefreshCapacities}
+              disabled={isLoadingCapacities}
+              className="ml-2"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingCapacities ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </DialogTitle>
           <DialogDescription>
             Assign team members to specific hour blocks for different project phases. Work day is 8 AM to 5 PM.
           </DialogDescription>
@@ -314,6 +344,7 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
                 <CardTitle className="flex items-center gap-2">
                   Daily Capacity Overview
                   {hasOverAllocation && <AlertTriangle className="h-5 w-5 text-red-500" />}
+                  {isLoadingCapacities && <Loader2 className="h-4 w-4 animate-spin" />}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">

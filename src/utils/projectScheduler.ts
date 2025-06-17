@@ -1,4 +1,3 @@
-
 import { Project, ProjectPhase } from '../types/project';
 import { addDays, subDays, format, isWeekend, parseISO, eachDayOfInterval } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -159,31 +158,67 @@ export class ProjectScheduler {
     return { isValid: false, suggestedDate };
   }
   
-  // Get working hours per day from settings, with fallback to default
-  static async getWorkingHours(): Promise<{ shopHours: number; stainHours: number }> {
+  // Get working hours per day from settings AND phase capacities
+  static async getWorkingHours(): Promise<{ 
+    shopHours: number; 
+    stainHours: number; 
+    phaseCapacities: { [key: string]: number } 
+  }> {
     try {
-      const { data, error } = await supabase
+      // Load general settings
+      const { data: settingsData, error: settingsError } = await supabase
         .from('settings')
         .select('key, value')
         .in('key', ['shop_hours_per_day', 'stain_hours_per_day']);
       
-      if (error) {
-        console.error('Error loading working hours:', error);
-        return { shopHours: this.DEFAULT_HOURS_PER_DAY, stainHours: 6 };
+      if (settingsError) {
+        console.error('Error loading working hours:', settingsError);
       }
       
-      const shopHoursSetting = data.find(s => s.key === 'shop_hours_per_day');
-      const stainHoursSetting = data.find(s => s.key === 'stain_hours_per_day');
+      const shopHoursSetting = settingsData?.find(s => s.key === 'shop_hours_per_day');
+      const stainHoursSetting = settingsData?.find(s => s.key === 'stain_hours_per_day');
       
-      // Handle Json type properly - convert to number
       const shopHours = shopHoursSetting ? Number(shopHoursSetting.value) : this.DEFAULT_HOURS_PER_DAY;
       const stainHours = stainHoursSetting ? Number(stainHoursSetting.value) : 6;
+
+      // Load phase-specific capacities
+      const { data: capacitiesData, error: capacitiesError } = await supabase
+        .from('daily_phase_capacities')
+        .select('phase, max_hours');
       
-      console.log('Working hours loaded:', { shopHours, stainHours });
-      return { shopHours, stainHours };
+      if (capacitiesError) {
+        console.error('Error loading phase capacities:', capacitiesError);
+      }
+
+      // Create phase capacities map with fallbacks
+      const phaseCapacities: { [key: string]: number } = {
+        millwork: shopHours,
+        boxConstruction: shopHours,
+        stain: stainHours,
+        install: shopHours
+      };
+
+      // Override with database values if available
+      if (capacitiesData) {
+        capacitiesData.forEach(capacity => {
+          phaseCapacities[capacity.phase] = capacity.max_hours;
+        });
+      }
+      
+      console.log('Working hours and phase capacities loaded:', { shopHours, stainHours, phaseCapacities });
+      return { shopHours, stainHours, phaseCapacities };
     } catch (error) {
-      console.error('Failed to load working hours:', error);
-      return { shopHours: this.DEFAULT_HOURS_PER_DAY, stainHours: 6 };
+      console.error('Failed to load working hours and capacities:', error);
+      return { 
+        shopHours: this.DEFAULT_HOURS_PER_DAY, 
+        stainHours: 6,
+        phaseCapacities: {
+          millwork: this.DEFAULT_HOURS_PER_DAY,
+          boxConstruction: this.DEFAULT_HOURS_PER_DAY,
+          stain: 6,
+          install: this.DEFAULT_HOURS_PER_DAY
+        }
+      };
     }
   }
 
@@ -199,8 +234,8 @@ export class ProjectScheduler {
     // Load holidays first - CRITICAL
     await this.loadHolidays();
     
-    // Get working hours
-    const { shopHours, stainHours } = await this.getWorkingHours();
+    // Get working hours and phase capacities
+    const { shopHours, stainHours, phaseCapacities } = await this.getWorkingHours();
     
     // By appending 'T00:00:00', we parse the date in the local timezone, not UTC.
     const installDate = new Date(`${project.installDate}T00:00:00`);
@@ -226,13 +261,19 @@ export class ProjectScheduler {
       console.log(`📦 Material order date ${format(materialOrderDate, 'yyyy-MM-dd')} is already a working day`);
     }
 
-    // Calculate duration in business days
-    const installDuration = Math.ceil(project.installHrs / shopHours);
-    const stainDuration = Math.ceil(project.stainHrs / stainHours);
-    const millworkDuration = Math.ceil(project.millworkHrs / shopHours);
-    const boxConstructionDuration = Math.ceil(project.boxConstructionHrs / shopHours);
+    // Calculate duration in business days using phase-specific capacities
+    const installDuration = Math.ceil(project.installHrs / phaseCapacities.install);
+    const stainDuration = Math.ceil(project.stainHrs / phaseCapacities.stain);
+    const millworkDuration = Math.ceil(project.millworkHrs / phaseCapacities.millwork);
+    const boxConstructionDuration = Math.ceil(project.boxConstructionHrs / phaseCapacities.boxConstruction);
     
-    console.log('📊 Project durations in business days:', { installDuration, stainDuration, millworkDuration, boxConstructionDuration });
+    console.log('📊 Project durations in business days (using phase capacities):', { 
+      installDuration, 
+      stainDuration, 
+      millworkDuration, 
+      boxConstructionDuration,
+      phaseCapacities 
+    });
     
     // Stain must complete before install (1 business day buffer)
     const stainEndDate = this.getPreviousWorkingDay(finalInstallDate);
@@ -280,7 +321,7 @@ export class ProjectScheduler {
     
     const phases: ProjectPhase[] = [];
     const calculatedProject = await this.calculateProjectDates(project);
-    const { shopHours, stainHours } = await this.getWorkingHours();
+    const { shopHours, stainHours, phaseCapacities } = await this.getWorkingHours();
     
     // Material Order phase
     if (calculatedProject.materialOrderDate) {
@@ -300,7 +341,7 @@ export class ProjectScheduler {
     // Millwork phase - create individual phases for each working day
     if (calculatedProject.millworkStartDate) {
       const millworkStartDate = new Date(`${calculatedProject.millworkStartDate}T00:00:00`);
-      const millworkDuration = Math.ceil(project.millworkHrs / shopHours);
+      const millworkDuration = Math.ceil(project.millworkHrs / phaseCapacities.millwork);
       
       console.log(`🔨 Generating millwork phases for ${millworkDuration} working days starting ${format(millworkStartDate, 'yyyy-MM-dd')}`);
       
@@ -331,7 +372,7 @@ export class ProjectScheduler {
     // Box Construction phase - create individual phases for each working day
     if (calculatedProject.boxConstructionStartDate) {
       const boxConstructionStartDate = new Date(`${calculatedProject.boxConstructionStartDate}T00:00:00`);
-      const boxConstructionDuration = Math.ceil(project.boxConstructionHrs / shopHours);
+      const boxConstructionDuration = Math.ceil(project.boxConstructionHrs / phaseCapacities.boxConstruction);
       
       console.log(`🔨 Generating box construction phases for ${boxConstructionDuration} working days starting ${format(boxConstructionStartDate, 'yyyy-MM-dd')}`);
       
@@ -362,7 +403,7 @@ export class ProjectScheduler {
     // Stain phase - create individual phases for each working day
     if (calculatedProject.stainStartDate) {
       const stainStartDate = new Date(`${calculatedProject.stainStartDate}T00:00:00`);
-      const stainDuration = Math.ceil(project.stainHrs / stainHours);
+      const stainDuration = Math.ceil(project.stainHrs / phaseCapacities.stain);
       
       console.log(`🎨 Generating stain phases for ${stainDuration} working days starting ${format(stainStartDate, 'yyyy-MM-dd')}`);
       
@@ -392,7 +433,7 @@ export class ProjectScheduler {
     
     // Install phase - create individual phases for each working day
     const installStartDate = new Date(`${calculatedProject.installDate}T00:00:00`);
-    const installDuration = Math.ceil(project.installHrs / shopHours);
+    const installDuration = Math.ceil(project.installHrs / phaseCapacities.install);
     
     console.log(`🔧 Generating install phases for ${installDuration} working days starting ${format(installStartDate, 'yyyy-MM-dd')}`);
     
