@@ -108,13 +108,11 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
     const hourBlocks = Array.from({ length: 9 }, (_, i) => i + 8);
     
     return hourBlocks.map(hour => {
-      // Check if any of the selected team members are already allocated for this hour on this project/phase
+      // Check if ANY of the selected team members are already allocated for this hour (any project/phase)
       const isAlreadyAllocated = selectedTeamMembers.some(teamMemberId =>
         allocations.some(alloc => 
           alloc.hourBlock === hour && 
-          alloc.teamMemberId === teamMemberId &&
-          alloc.projectId === selectedProject &&
-          alloc.phase === selectedPhase
+          alloc.teamMemberId === teamMemberId
         )
       );
       
@@ -124,7 +122,7 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
         label: `${hour}:00 - ${hour + 1}:00`
       };
     });
-  }, [allocations, selectedTeamMembers, selectedProject, selectedPhase]);
+  }, [allocations, selectedTeamMembers]);
 
   const handleTeamMemberToggle = (memberId: string, checked: boolean) => {
     setSelectedTeamMembers(prev => 
@@ -223,11 +221,9 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
       for (const member of eligibleMembers) {
         if (allocationsAdded >= remainingCapacity) break;
         
-        // Get current allocations for this member on this date/phase/project
+        // Get current allocations for this member on this date (any project/phase)
         let memberCurrentAllocations = allocations.filter(alloc => 
-          alloc.teamMemberId === member.id && 
-          alloc.phase === selectedPhase &&
-          alloc.projectId === selectedProject
+          alloc.teamMemberId === member.id
         ).length;
         
         // Fill this member's day (up to 9 hours max) before moving to next member
@@ -235,26 +231,33 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
           if (allocationsAdded >= remainingCapacity) break;
           if (memberCurrentAllocations >= 9) break; // Don't exceed 9 hours per person
           
-          // Check if this member is already allocated for this hour/project/phase
+          // Check if this member is already allocated for this hour (ANY project/phase)
           const isAlreadyAllocated = allocations.some(alloc => 
             alloc.hourBlock === hour && 
-            alloc.teamMemberId === member.id &&
-            alloc.projectId === selectedProject &&
-            alloc.phase === selectedPhase
+            alloc.teamMemberId === member.id
           );
           
           if (!isAlreadyAllocated) {
-            await addAllocationSilentMutation.mutateAsync({
-              projectId: selectedProject,
-              teamMemberId: member.id,
-              phase: selectedPhase as 'millwork' | 'boxConstruction' | 'stain' | 'install',
-              date: dateString,
-              hourBlock: hour,
-            });
+            try {
+              await addAllocationSilentMutation.mutateAsync({
+                projectId: selectedProject,
+                teamMemberId: member.id,
+                phase: selectedPhase as 'millwork' | 'boxConstruction' | 'stain' | 'install',
+                date: dateString,
+                hourBlock: hour,
+              });
 
-            memberCurrentAllocations++;
-            allocationsAdded++;
-            setAutoFillProgress(allocationsAdded);
+              memberCurrentAllocations++;
+              allocationsAdded++;
+              setAutoFillProgress(allocationsAdded);
+            } catch (error: any) {
+              // If we hit a double-booking constraint error, skip this allocation
+              if (error.message?.includes('duplicate key value') || error.message?.includes('unique constraint')) {
+                console.warn(`Skipping double-booking for ${member.name} at hour ${hour}`);
+                continue;
+              }
+              throw error;
+            }
           }
         }
       }
@@ -291,27 +294,47 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
 
     try {
       const dateString = format(date, 'yyyy-MM-dd');
+      let successCount = 0;
+      let conflictCount = 0;
       
       for (const teamMemberId of selectedTeamMembers) {
         for (const hourBlock of selectedHourBlocks) {
-          // Check if this specific allocation already exists
+          // Check if this member is already allocated for this hour (ANY project/phase)
           const existingAllocation = allocations.find(alloc => 
             alloc.hourBlock === hourBlock && 
-            alloc.teamMemberId === teamMemberId &&
-            alloc.projectId === selectedProject &&
-            alloc.phase === selectedPhase
+            alloc.teamMemberId === teamMemberId
           );
           
           if (!existingAllocation) {
-            await addAllocationMutation.mutateAsync({
-              projectId: selectedProject,
-              teamMemberId: teamMemberId,
-              phase: selectedPhase as 'millwork' | 'boxConstruction' | 'stain' | 'install',
-              date: dateString,
-              hourBlock: hourBlock,
-            });
+            try {
+              await addAllocationMutation.mutateAsync({
+                projectId: selectedProject,
+                teamMemberId: teamMemberId,
+                phase: selectedPhase as 'millwork' | 'boxConstruction' | 'stain' | 'install',
+                date: dateString,
+                hourBlock: hourBlock,
+              });
+              successCount++;
+            } catch (error: any) {
+              if (error.message?.includes('duplicate key value') || error.message?.includes('unique constraint')) {
+                conflictCount++;
+                console.warn(`Double-booking prevented for team member ${teamMemberId} at hour ${hourBlock}`);
+              } else {
+                throw error;
+              }
+            }
+          } else {
+            conflictCount++;
           }
         }
+      }
+      
+      if (conflictCount > 0) {
+        toast({
+          title: "Partial Success",
+          description: `Added ${successCount} allocations. ${conflictCount} conflicts were prevented (team members already assigned during those hours).`,
+          variant: "default",
+        });
       }
       
       // Reset form
@@ -357,7 +380,7 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
             </Button>
           </DialogTitle>
           <DialogDescription>
-            Assign team members to specific hour blocks for different project phases. Work day is 8 AM to 5 PM.
+            Assign team members to specific hour blocks for different project phases. Work day is 8 AM to 5 PM. Team members cannot be double-booked.
           </DialogDescription>
         </DialogHeader>
 
