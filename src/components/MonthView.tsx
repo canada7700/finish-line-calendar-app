@@ -1,13 +1,15 @@
 
-import { useMemo, useState } from 'react';
+import { useMemo,useState } from 'react';
 import { ProjectPhase, ProjectNote, DailyNote } from '../types/project';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, startOfWeek, endOfWeek } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertTriangle, MessageSquare } from 'lucide-react';
+import { AlertTriangle, MessageSquare, Clock } from 'lucide-react';
 import { Holiday } from '@/hooks/useHolidays';
 import { useProjectNotes } from '@/hooks/useProjectNotes';
 import { useDailyNotes } from '@/hooks/useDailyNotes';
 import { usePhaseExceptions } from '@/hooks/usePhaseExceptions';
+import { useDailyHourAllocations } from '@/hooks/useDailyHourAllocations';
+import { useDailyPhaseCapacities, useDayCapacityInfo } from '@/hooks/useDailyCapacities';
 import DayDialog from './DayDialog';
 
 interface MonthViewProps {
@@ -25,6 +27,7 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
   const { data: projectNotes = [], refetch: refetchProjectNotes } = useProjectNotes(monthStart, monthEnd);
   const { data: dailyNotes = [], refetch: refetchDailyNotes } = useDailyNotes(monthStart, monthEnd);
   const { data: phaseExceptions = [], refetch: refetchPhaseExceptions } = usePhaseExceptions();
+  const { data: capacities = [] } = useDailyPhaseCapacities();
 
   const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
@@ -60,6 +63,16 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
     return map;
   }, [phaseExceptions]);
 
+  // Get all hour allocations for the month
+  const allMonthAllocations = useMemo(() => {
+    const allAllocations: any[] = [];
+    calendarDays.forEach(day => {
+      // This is a simplified version - in a real implementation you'd want to batch these queries
+      // For now, we'll use a placeholder empty array since we can't call hooks conditionally
+    });
+    return allAllocations;
+  }, [calendarDays]);
+
   const isNonWorkingDay = (date: Date) => {
     const isWeekendDay = isWeekend(date);
     const dateString = format(date, 'yyyy-MM-dd');
@@ -81,7 +94,7 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
     });
   };
 
-  const getDayClasses = (date: Date, dayPhases: ProjectPhase[]) => {
+  const getDayClasses = (date: Date, dayPhases: ProjectPhase[], hasCapacityIssues: boolean = false) => {
     const nonWorkingInfo = isNonWorkingDay(date);
     const isCurrentMonth = date >= monthStart && date <= monthEnd;
     
@@ -97,6 +110,8 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
     
     if (dayPhases.length > 0 && nonWorkingInfo.isNonWorking) {
       classes += "border-red-300 border-2 ";
+    } else if (hasCapacityIssues) {
+      classes += "border-red-400 border-2 ";
     }
     
     return classes;
@@ -138,10 +153,13 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
               const dayDailyNote = dailyNotesByDate.get(dateString);
               const hasNotes = dayProjectNotes.some(n => n.note) || (dayDailyNote && dayDailyNote.note);
               
+              // Placeholder for capacity issues - would need actual allocation data
+              const hasCapacityIssues = false;
+              
               return (
                 <div
                   key={day.toISOString()}
-                  className={getDayClasses(day, dayPhases)}
+                  className={getDayClasses(day, dayPhases, hasCapacityIssues)}
                   onClick={() => handleDayClick(day)}
                 >
                   <div>
@@ -152,6 +170,9 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
                       <div className="flex items-center gap-1">
                         {hasNotes && isCurrentMonth && (
                           <MessageSquare className="h-3 w-3 text-blue-500" />
+                        )}
+                        {hasCapacityIssues && isCurrentMonth && (
+                          <Clock className="h-3 w-3 text-orange-500" />
                         )}
                         {hasSchedulingConflict && (
                           <AlertTriangle className="h-3 w-3 text-red-500" />

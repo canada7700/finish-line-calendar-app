@@ -9,6 +9,54 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      daily_hour_allocations: {
+        Row: {
+          created_at: string
+          date: string
+          hour_block: number
+          id: string
+          phase: string
+          project_id: string
+          team_member_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          hour_block: number
+          id?: string
+          phase: string
+          project_id: string
+          team_member_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          hour_block?: number
+          id?: string
+          phase?: string
+          project_id?: string
+          team_member_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_hour_allocations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_hour_allocations_team_member_id_fkey"
+            columns: ["team_member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_notes: {
         Row: {
           created_at: string
@@ -29,6 +77,30 @@ export type Database = {
           date?: string
           id?: string
           note?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      daily_phase_capacities: {
+        Row: {
+          created_at: string
+          id: string
+          max_hours: number
+          phase: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          max_hours?: number
+          phase: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          max_hours?: number
+          phase?: string
           updated_at?: string
         }
         Relationships: []

@@ -1,3 +1,4 @@
+
 export interface Project {
   id: string;
   jobName: string;
@@ -74,4 +75,32 @@ export interface DailyNote {
   note: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface DailyHourAllocation {
+  id: string;
+  projectId: string;
+  teamMemberId: string;
+  phase: 'millwork' | 'boxConstruction' | 'stain' | 'install';
+  date: string;
+  hourBlock: number;
+  createdAt: string;
+  updatedAt: string;
+  teamMember?: TeamMember;
+  project?: Pick<Project, 'id' | 'jobName'>;
+}
+
+export interface DailyPhaseCapacity {
+  id: string;
+  phase: 'millwork' | 'boxConstruction' | 'stain' | 'install';
+  maxHours: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DayCapacityInfo {
+  phase: 'millwork' | 'boxConstruction' | 'stain' | 'install';
+  allocated: number;
+  capacity: number;
+  isOverAllocated: boolean;
 }
