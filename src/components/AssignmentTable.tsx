@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { Project, ProjectAssignment, TeamMember } from '../types/project';
 import { useProjectAssignments } from '@/hooks/useProjectAssignments';
@@ -31,6 +30,8 @@ export const AssignmentTable: React.FC<AssignmentTableProps> = ({
   const deleteAssignmentMutation = useDeleteProjectAssignment();
 
   const [newAssignments, setNewAssignments] = React.useState<{ [key: string]: { memberIds: string[]; hours: number } }>({});
+  const [editingHours, setEditingHours] = React.useState<{ [assignmentId: string]: string }>({});
+  const [pendingUpdates, setPendingUpdates] = React.useState<Set<string>>(new Set());
 
   const phases: { key: Phase; title: string; hours: number; colorClass: string }[] = [
     { key: 'millwork', title: 'Millwork', hours: project.millworkHrs, colorClass: 'bg-blue-50 border-blue-200' },
@@ -39,12 +40,40 @@ export const AssignmentTable: React.FC<AssignmentTableProps> = ({
     { key: 'install', title: 'Install', hours: project.installHrs, colorClass: 'bg-purple-50 border-purple-200' },
   ];
 
+  // Debounced update effect
+  React.useEffect(() => {
+    const timeouts: { [key: string]: NodeJS.Timeout } = {};
+
+    Object.entries(editingHours).forEach(([assignmentId, value]) => {
+      if (timeouts[assignmentId]) {
+        clearTimeout(timeouts[assignmentId]);
+      }
+
+      timeouts[assignmentId] = setTimeout(() => {
+        const hours = parseInt(value) || 0;
+        const assignment = assignments.find(a => a.id === assignmentId);
+        if (assignment && assignment.assignedHours !== hours) {
+          handleHourUpdate(assignmentId, hours);
+        }
+      }, 1500); // Wait 1.5 seconds after user stops typing
+    });
+
+    return () => {
+      Object.values(timeouts).forEach(timeout => clearTimeout(timeout));
+    };
+  }, [editingHours, assignments]);
+
   const getPhaseAssignments = (phase: Phase) => {
     return assignments.filter(a => a.phase === phase);
   };
 
   const getAssignedHours = (phase: Phase) => {
-    return getPhaseAssignments(phase).reduce((acc, a) => acc + a.assignedHours, 0);
+    const phaseAssignments = getPhaseAssignments(phase);
+    return phaseAssignments.reduce((acc, a) => {
+      // Use editing value if available, otherwise use stored value
+      const hours = editingHours[a.id] ? (parseInt(editingHours[a.id]) || 0) : a.assignedHours;
+      return acc + hours;
+    }, 0);
   };
 
   const getAvailableMembers = (phase: Phase) => {
@@ -87,8 +116,40 @@ export const AssignmentTable: React.FC<AssignmentTableProps> = ({
     setNewAssignments(prev => ({ ...prev, [phase]: { memberIds: [], hours: 0 } }));
   };
 
-  const handleHourChange = (assignmentId: string, hours: number) => {
-    updateAssignmentMutation.mutate({ id: assignmentId, assignedHours: hours });
+  const handleHourUpdate = (assignmentId: string, hours: number) => {
+    setPendingUpdates(prev => new Set(prev).add(assignmentId));
+    updateAssignmentMutation.mutate(
+      { id: assignmentId, assignedHours: hours },
+      {
+        onSettled: () => {
+          setPendingUpdates(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(assignmentId);
+            return newSet;
+          });
+          setEditingHours(prev => {
+            const newState = { ...prev };
+            delete newState[assignmentId];
+            return newState;
+          });
+        }
+      }
+    );
+  };
+
+  const handleHourInputChange = (assignmentId: string, value: string) => {
+    setEditingHours(prev => ({ ...prev, [assignmentId]: value }));
+  };
+
+  const handleHourInputBlur = (assignmentId: string) => {
+    const value = editingHours[assignmentId];
+    if (value !== undefined) {
+      const hours = parseInt(value) || 0;
+      const assignment = assignments.find(a => a.id === assignmentId);
+      if (assignment && assignment.assignedHours !== hours) {
+        handleHourUpdate(assignmentId, hours);
+      }
+    }
   };
 
   const handleDelete = (assignmentId: string) => {
@@ -167,6 +228,10 @@ export const AssignmentTable: React.FC<AssignmentTableProps> = ({
                 <TableBody>
                   {phaseAssignments.map(assignment => {
                     const member = teamMembers.find(tm => tm.id === assignment.teamMemberId);
+                    const isEditing = editingHours[assignment.id] !== undefined;
+                    const isPending = pendingUpdates.has(assignment.id);
+                    const displayValue = isEditing ? editingHours[assignment.id] : assignment.assignedHours.toString();
+                    
                     return (
                       <TableRow key={assignment.id}>
                         <TableCell className="font-medium">
@@ -176,10 +241,11 @@ export const AssignmentTable: React.FC<AssignmentTableProps> = ({
                           <Input
                             type="number"
                             min="0"
-                            value={assignment.assignedHours}
-                            onChange={e => handleHourChange(assignment.id, parseInt(e.target.value) || 0)}
-                            disabled={updateAssignmentMutation.isPending}
-                            className="w-20"
+                            value={displayValue}
+                            onChange={e => handleHourInputChange(assignment.id, e.target.value)}
+                            onBlur={() => handleHourInputBlur(assignment.id)}
+                            disabled={updateAssignmentMutation.isPending && isPending}
+                            className={`w-20 ${isPending ? 'border-yellow-300 bg-yellow-50' : isEditing ? 'border-blue-300' : ''}`}
                           />
                         </TableCell>
                         <TableCell>
