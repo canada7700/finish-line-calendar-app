@@ -1,3 +1,4 @@
+
 import * as React from 'react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -8,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Trash2, Plus, AlertTriangle, Wand2, CheckSquare, Square, Users, Grid3X3, List, Loader2, RefreshCw } from 'lucide-react';
+import { Trash2, Plus, AlertTriangle, Wand2, CheckSquare, Square, Users, Grid3X3, List, Loader2, RefreshCw, X } from 'lucide-react';
 import { ProjectPhase } from '../types/project';
 import { useTeamMembers } from '../hooks/useTeamMembers';
 import { useAllProjectAssignments } from '../hooks/useProjectAssignments';
@@ -27,7 +28,7 @@ interface HourAllocationDialogProps {
 const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocationDialogProps) => {
   const [selectedProject, setSelectedProject] = React.useState<string>('');
   const [selectedPhase, setSelectedPhase] = React.useState<string>('');
-  const [selectedTeamMember, setSelectedTeamMember] = React.useState<string>('');
+  const [selectedTeamMembers, setSelectedTeamMembers] = React.useState<string[]>([]);
   const [selectedHourBlocks, setSelectedHourBlocks] = React.useState<number[]>([]);
   const [viewMode, setViewMode] = React.useState<'grid' | 'list'>('grid');
   const [isAutoFilling, setIsAutoFilling] = React.useState(false);
@@ -103,18 +104,20 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
   }, [allocations]);
 
   const getAvailableHourBlocks = React.useCallback(() => {
-    if (!selectedTeamMember) return [];
+    if (selectedTeamMembers.length === 0) return [];
     
     // Extended to 9 hours: 8 AM to 5 PM
     const hourBlocks = Array.from({ length: 9 }, (_, i) => i + 8);
     
     return hourBlocks.map(hour => {
-      // Check if this specific team member is already allocated for this hour on this project/phase
-      const isAlreadyAllocated = allocations.some(alloc => 
-        alloc.hourBlock === hour && 
-        alloc.teamMemberId === selectedTeamMember &&
-        alloc.projectId === selectedProject &&
-        alloc.phase === selectedPhase
+      // Check if any of the selected team members are already allocated for this hour on this project/phase
+      const isAlreadyAllocated = selectedTeamMembers.some(teamMemberId =>
+        allocations.some(alloc => 
+          alloc.hourBlock === hour && 
+          alloc.teamMemberId === teamMemberId &&
+          alloc.projectId === selectedProject &&
+          alloc.phase === selectedPhase
+        )
       );
       
       return {
@@ -123,7 +126,30 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
         label: `${hour}:00 - ${hour + 1}:00`
       };
     });
-  }, [allocations, selectedTeamMember, selectedProject, selectedPhase]);
+  }, [allocations, selectedTeamMembers, selectedProject, selectedPhase]);
+
+  const handleTeamMemberToggle = (memberId: string, checked: boolean) => {
+    setSelectedTeamMembers(prev => 
+      checked 
+        ? [...prev, memberId]
+        : prev.filter(id => id !== memberId)
+    );
+  };
+
+  const handleSelectAllEligibleMembers = () => {
+    if (!selectedPhase) return;
+    const eligibleMembers = getEligibleTeamMembers(selectedPhase);
+    const eligibleMemberIds = eligibleMembers.map(member => member.id);
+    setSelectedTeamMembers(eligibleMemberIds);
+  };
+
+  const handleClearTeamMemberSelection = () => {
+    setSelectedTeamMembers([]);
+  };
+
+  const handleRemoveTeamMember = (memberId: string) => {
+    setSelectedTeamMembers(prev => prev.filter(id => id !== memberId));
+  };
 
   const handleHourBlockToggle = (hour: number, checked: boolean) => {
     setSelectedHourBlocks(prev => 
@@ -248,7 +274,7 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
       // Reset form
       setSelectedProject('');
       setSelectedPhase('');
-      setSelectedTeamMember('');
+      setSelectedTeamMembers([]);
       setSelectedHourBlocks([]);
     } catch (error) {
       toast({
@@ -265,28 +291,40 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
   };
 
   const handleAddAllocations = async () => {
-    if (!selectedProject || !selectedPhase || !selectedTeamMember || selectedHourBlocks.length === 0) {
-      toast({ title: "Missing Information", description: "Please fill in all fields and select at least one hour block", variant: "destructive" });
+    if (!selectedProject || !selectedPhase || selectedTeamMembers.length === 0 || selectedHourBlocks.length === 0) {
+      toast({ title: "Missing Information", description: "Please fill in all fields and select at least one team member and hour block", variant: "destructive" });
       return;
     }
 
     try {
       const dateString = format(date, 'yyyy-MM-dd');
       
-      for (const hourBlock of selectedHourBlocks) {
-        await addAllocationMutation.mutateAsync({
-          projectId: selectedProject,
-          teamMemberId: selectedTeamMember,
-          phase: selectedPhase as 'millwork' | 'boxConstruction' | 'stain' | 'install',
-          date: dateString,
-          hourBlock: hourBlock,
-        });
+      for (const teamMemberId of selectedTeamMembers) {
+        for (const hourBlock of selectedHourBlocks) {
+          // Check if this specific allocation already exists
+          const existingAllocation = allocations.find(alloc => 
+            alloc.hourBlock === hourBlock && 
+            alloc.teamMemberId === teamMemberId &&
+            alloc.projectId === selectedProject &&
+            alloc.phase === selectedPhase
+          );
+          
+          if (!existingAllocation) {
+            await addAllocationMutation.mutateAsync({
+              projectId: selectedProject,
+              teamMemberId: teamMemberId,
+              phase: selectedPhase as 'millwork' | 'boxConstruction' | 'stain' | 'install',
+              date: dateString,
+              hourBlock: hourBlock,
+            });
+          }
+        }
       }
       
       // Reset form
       setSelectedProject('');
       setSelectedPhase('');
-      setSelectedTeamMember('');
+      setSelectedTeamMembers([]);
       setSelectedHourBlocks([]);
     } catch (error) {
       // Error handled by mutation
@@ -496,28 +534,94 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
                       </SelectContent>
                     </Select>
                   </div>
-                  
-                  <div className="col-span-2">
-                    <label className="text-sm font-medium">Team Member</label>
-                    <Select value={selectedTeamMember} onValueChange={setSelectedTeamMember}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select team member" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {teamMembers?.filter(member => member.isActive).map((member) => {
-                          const isEligible = selectedPhase ? getEligibleTeamMembers(selectedPhase).some(em => em.id === member.id) : true;
-                          return (
-                            <SelectItem key={member.id} value={member.id} disabled={!isEligible}>
-                              {member.name} {!isEligible && '(Not eligible for this phase)'}
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </div>
                 
-                {selectedTeamMember && selectedProject && selectedPhase && (
+                {/* Multi-Select Team Members */}
+                {selectedPhase && (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="text-sm font-medium">Team Members</label>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleSelectAllEligibleMembers}
+                          disabled={eligibleMembers.length === 0}
+                        >
+                          <CheckSquare className="h-3 w-3 mr-1" />
+                          Select All Eligible
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleClearTeamMemberSelection}
+                          disabled={selectedTeamMembers.length === 0}
+                        >
+                          <Square className="h-3 w-3 mr-1" />
+                          Clear Selection
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    {/* Selected Team Members Display */}
+                    {selectedTeamMembers.length > 0 && (
+                      <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="text-sm font-medium mb-2">
+                          Selected ({selectedTeamMembers.length} members):
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedTeamMembers.map((memberId) => {
+                            const member = teamMembers?.find(m => m.id === memberId);
+                            return (
+                              <Badge key={memberId} variant="secondary" className="flex items-center gap-1">
+                                {member?.name}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemoveTeamMember(memberId)}
+                                  className="h-4 w-4 p-0 hover:bg-transparent"
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Team Member Checkboxes */}
+                    <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                      {teamMembers?.filter(member => member.isActive).map((member) => {
+                        const isEligible = eligibleMembers.some(em => em.id === member.id);
+                        const isSelected = selectedTeamMembers.includes(member.id);
+                        
+                        return (
+                          <div key={member.id} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`member-${member.id}`}
+                              checked={isSelected}
+                              onCheckedChange={(checked) => handleTeamMemberToggle(member.id, checked as boolean)}
+                              disabled={!isEligible}
+                            />
+                            <label
+                              htmlFor={`member-${member.id}`}
+                              className={`text-sm cursor-pointer ${
+                                !isEligible ? 'text-muted-foreground' : ''
+                              }`}
+                            >
+                              {member.name} {!isEligible && '(Not eligible)'}
+                            </label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                
+                {selectedTeamMembers.length > 0 && selectedProject && selectedPhase && (
                   <div>
                     <div className="flex items-center justify-between mb-3">
                       <label className="text-sm font-medium">Hour Blocks</label>
@@ -558,7 +662,7 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
                             htmlFor={`hour-${block.hour}`}
                             className={`text-sm ${block.isAlreadyAllocated ? 'text-muted-foreground line-through' : 'cursor-pointer'}`}
                           >
-                            {block.label} {block.isAlreadyAllocated && '(Already allocated)'}
+                            {block.label} {block.isAlreadyAllocated && '(Conflicts exist)'}
                           </label>
                         </div>
                       ))}
@@ -568,11 +672,11 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
                 
                 <Button 
                   onClick={handleAddAllocations} 
-                  disabled={!selectedProject || !selectedPhase || !selectedTeamMember || selectedHourBlocks.length === 0 || addAllocationMutation.isPending}
+                  disabled={!selectedProject || !selectedPhase || selectedTeamMembers.length === 0 || selectedHourBlocks.length === 0 || addAllocationMutation.isPending}
                   className="w-full"
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Selected Hour Allocations ({selectedHourBlocks.length})
+                  Add Selected Allocations ({selectedTeamMembers.length} members × {selectedHourBlocks.length} hours)
                 </Button>
               </CardContent>
             </Card>
