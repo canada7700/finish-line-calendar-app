@@ -5,7 +5,7 @@ import { useAddProjectAssignment, useUpdateProjectAssignment, useDeleteProjectAs
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Trash2, Plus, Users, X } from 'lucide-react';
+import { Trash2, Plus, Users, X, AlertTriangle } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
@@ -73,6 +73,25 @@ export const AssignmentTable: React.FC<AssignmentTableProps> = ({
     return phaseAssignments.reduce((acc, a) => acc + a.assignedHours, 0);
   };
 
+  // Calculate total hours including temporary editing values for real-time overage detection
+  const getTotalHours = (phase: Phase) => {
+    const phaseAssignments = getPhaseAssignments(phase);
+    return phaseAssignments.reduce((acc, a) => {
+      const hours = editingHours[a.id] ? (parseInt(editingHours[a.id]) || 0) : a.assignedHours;
+      return acc + hours;
+    }, 0);
+  };
+
+  // Check if phase has hour overage
+  const getOverageInfo = (phase: Phase) => {
+    const totalHours = getTotalHours(phase);
+    const allocatedHours = phases.find(p => p.key === phase)?.hours || 0;
+    const isOverage = totalHours > allocatedHours;
+    const overageAmount = isOverage ? totalHours - allocatedHours : 0;
+    
+    return { isOverage, overageAmount, totalHours };
+  };
+
   // Use editing values for individual input displays
   const getDisplayedHours = (assignmentId: string) => {
     const assignment = assignments.find(a => a.id === assignmentId);
@@ -81,6 +100,15 @@ export const AssignmentTable: React.FC<AssignmentTableProps> = ({
     return editingHours[assignmentId] !== undefined 
       ? editingHours[assignmentId] 
       : assignment.assignedHours.toString();
+  };
+
+  // Check if individual assignment contributes to overage
+  const isAssignmentOverage = (assignmentId: string) => {
+    const assignment = assignments.find(a => a.id === assignmentId);
+    if (!assignment) return false;
+    
+    const { isOverage } = getOverageInfo(assignment.phase);
+    return isOverage;
   };
 
   const getAvailableMembers = (phase: Phase) => {
@@ -208,20 +236,47 @@ export const AssignmentTable: React.FC<AssignmentTableProps> = ({
         const eligibleMembers = getEligibleMembers(phase.key);
         const progressPercentage = phase.hours > 0 ? (assignedHours / phase.hours) * 100 : 0;
         const selectedMemberIds = newAssignments[phase.key]?.memberIds || [];
+        const { isOverage, overageAmount, totalHours } = getOverageInfo(phase.key);
 
         return (
           <div key={phase.key} className={`border rounded-lg p-4 space-y-4 ${phase.colorClass}`}>
             <div className="flex items-center justify-between">
-              <h4 className="text-lg font-semibold">{phase.title}</h4>
-              <div className="text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <h4 className="text-lg font-semibold">{phase.title}</h4>
+                {isOverage && (
+                  <div className="flex items-center gap-1 text-red-600">
+                    <AlertTriangle className="h-4 w-4" />
+                    <span className="text-sm font-medium">Overage</span>
+                  </div>
+                )}
+              </div>
+              <div className={`text-sm ${isOverage ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
                 {assignedHours} / {phase.hours} hours
+                {isOverage && (
+                  <div className="text-xs text-red-600">
+                    {overageAmount} hours over budget
+                  </div>
+                )}
               </div>
             </div>
             
             <Progress 
               value={Math.min(progressPercentage, 100)} 
-              className="h-2 transition-all duration-300"
+              className={`h-2 transition-all duration-300 ${
+                isOverage 
+                  ? '[&>div]:bg-red-500' 
+                  : ''
+              }`}
             />
+
+            {isOverage && (
+              <div className="flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+                <AlertTriangle className="h-4 w-4" />
+                <span>
+                  Warning: Total assigned hours ({totalHours}) exceed allocated hours ({phase.hours}) by {overageAmount} hours.
+                </span>
+              </div>
+            )}
 
             {phaseAssignments.length > 0 && (
               <Table>
@@ -238,6 +293,7 @@ export const AssignmentTable: React.FC<AssignmentTableProps> = ({
                     const isEditing = editingHours[assignment.id] !== undefined;
                     const isPending = pendingUpdates.has(assignment.id);
                     const displayValue = getDisplayedHours(assignment.id);
+                    const assignmentOverage = isAssignmentOverage(assignment.id);
                     
                     return (
                       <TableRow key={assignment.id}>
@@ -252,7 +308,15 @@ export const AssignmentTable: React.FC<AssignmentTableProps> = ({
                             onChange={e => handleHourInputChange(assignment.id, e.target.value)}
                             onBlur={() => handleHourInputBlur(assignment.id)}
                             disabled={updateAssignmentMutation.isPending && isPending}
-                            className={`w-20 ${isPending ? 'border-yellow-300 bg-yellow-50' : isEditing ? 'border-blue-300' : ''}`}
+                            className={`w-20 ${
+                              isPending 
+                                ? 'border-yellow-300 bg-yellow-50' 
+                                : isEditing 
+                                  ? 'border-blue-300' 
+                                  : assignmentOverage 
+                                    ? 'border-red-300 bg-red-50' 
+                                    : ''
+                            }`}
                           />
                         </TableCell>
                         <TableCell>
