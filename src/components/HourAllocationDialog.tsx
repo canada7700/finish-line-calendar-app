@@ -128,10 +128,15 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
 
     try {
       const dateString = format(date, 'yyyy-MM-dd');
-      let memberIndex = 0;
-
+      
       for (const block of availableBlocks) {
-        const selectedMember = memberAllocationCounts[memberIndex % memberAllocationCounts.length];
+        // Find the first member who hasn't reached 9 hours yet
+        const selectedMember = memberAllocationCounts.find(member => member.currentAllocations < 9);
+        
+        if (!selectedMember) {
+          // All eligible members have reached 9 hours, stop allocation
+          break;
+        }
         
         await addAllocationMutation.mutateAsync({
           projectId: selectedProject,
@@ -143,7 +148,6 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
 
         // Update the count for this member
         selectedMember.currentAllocations++;
-        memberIndex++;
       }
 
       toast({
