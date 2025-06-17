@@ -10,7 +10,7 @@ import { Trash2, Plus, AlertTriangle } from 'lucide-react';
 import { ProjectPhase } from '../types/project';
 import { useTeamMembers } from '../hooks/useTeamMembers';
 import { useAllProjectAssignments } from '../hooks/useProjectAssignments';
-import { useDailyHourAllocations, useAddHourAllocation, useDeleteHourAllocation } from '../hooks/useDailyHourAllocations';
+import { useDailyHourAllocations, useAddHourAllocation, useRemoveHourAllocation } from '../hooks/useDailyHourAllocations';
 import { useDailyPhaseCapacities, useDayCapacityInfo } from '../hooks/useDailyCapacities';
 import { toast } from '@/hooks/use-toast';
 
@@ -32,7 +32,7 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
   const { data: allocations = [], isLoading: isLoadingAllocations } = useDailyHourAllocations(date);
   const { data: capacities = [] } = useDailyPhaseCapacities();
   const addAllocationMutation = useAddHourAllocation();
-  const deleteAllocationMutation = useDeleteHourAllocation();
+  const removeAllocationMutation = useRemoveHourAllocation();
 
   const { capacityInfo, hasOverAllocation } = useDayCapacityInfo(date, allocations, capacities);
 
@@ -72,7 +72,7 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
 
   const handleDeleteAllocation = async (allocationId: string) => {
     try {
-      await deleteAllocationMutation.mutateAsync(allocationId);
+      await removeAllocationMutation.mutateAsync(allocationId);
     } catch (error) {
       // Error handled by mutation
     }
@@ -235,7 +235,7 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
                           variant="ghost"
                           size="icon"
                           onClick={() => handleDeleteAllocation(allocation.id)}
-                          disabled={deleteAllocationMutation.isPending}
+                          disabled={removeAllocationMutation.isPending}
                           className="text-muted-foreground hover:text-destructive"
                         >
                           <Trash2 className="h-4 w-4" />

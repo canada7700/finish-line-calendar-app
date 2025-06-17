@@ -1,7 +1,7 @@
-
 import * as React from 'react';
 import { Project, ProjectAssignment, TeamMember } from '../types/project';
-import { useAddProjectAssignment, useUpdateProjectAssignment, useDeleteProjectAssignment } from '@/hooks/useProjectAssignments';
+import { useProjectAssignments } from '@/hooks/useProjectAssignments';
+import { useAddProjectAssignment, useUpdateProjectAssignment, useDeleteProjectAssignment } from '@/hooks/useProjectAssignmentMutations';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
