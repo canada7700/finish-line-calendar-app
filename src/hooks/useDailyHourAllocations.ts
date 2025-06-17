@@ -98,6 +98,37 @@ export const useAddHourAllocation = () => {
   });
 };
 
+export const useAddHourAllocationSilent = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (allocationData: Omit<DailyHourAllocation, 'id' | 'createdAt' | 'updatedAt' | 'teamMember' | 'project'>) => {
+      const { data, error } = await supabase
+        .from('daily_hour_allocations')
+        .insert({
+          project_id: allocationData.projectId,
+          team_member_id: allocationData.teamMemberId,
+          phase: allocationData.phase,
+          date: allocationData.date,
+          hour_block: allocationData.hourBlock,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['daily-hour-allocations'] });
+      // No toast notification for silent operations
+    },
+    onError: (error: any) => {
+      // Still show errors for debugging
+      console.error('Silent allocation error:', error);
+      throw error;
+    },
+  });
+};
+
 export const useRemoveHourAllocation = () => {
   const queryClient = useQueryClient();
   return useMutation({
