@@ -8,11 +8,11 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Trash2, Plus, AlertTriangle, Wand2, CheckSquare, Square, Users, Grid3X3, List } from 'lucide-react';
+import { Trash2, Plus, AlertTriangle, Wand2, CheckSquare, Square, Users, Grid3X3, List, Loader2 } from 'lucide-react';
 import { ProjectPhase } from '../types/project';
 import { useTeamMembers } from '../hooks/useTeamMembers';
 import { useAllProjectAssignments } from '../hooks/useProjectAssignments';
-import { useDailyHourAllocations, useAddHourAllocation, useRemoveHourAllocation } from '../hooks/useDailyHourAllocations';
+import { useDailyHourAllocations, useAddHourAllocation, useAddHourAllocationSilent, useRemoveHourAllocation } from '../hooks/useDailyHourAllocations';
 import { useDailyPhaseCapacities, useDayCapacityInfo } from '../hooks/useDailyCapacities';
 import { toast } from '@/hooks/use-toast';
 import HourAllocationGrid from './HourAllocationGrid';
@@ -30,12 +30,16 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
   const [selectedTeamMember, setSelectedTeamMember] = React.useState<string>('');
   const [selectedHourBlocks, setSelectedHourBlocks] = React.useState<number[]>([]);
   const [viewMode, setViewMode] = React.useState<'grid' | 'list'>('grid');
+  const [isAutoFilling, setIsAutoFilling] = React.useState(false);
+  const [autoFillProgress, setAutoFillProgress] = React.useState(0);
+  const [autoFillTotal, setAutoFillTotal] = React.useState(0);
 
   const { teamMembers, isLoading: isLoadingTeamMembers } = useTeamMembers();
   const { data: assignments } = useAllProjectAssignments();
   const { data: allocations = [], isLoading: isLoadingAllocations } = useDailyHourAllocations(date);
   const { data: capacities = [] } = useDailyPhaseCapacities();
   const addAllocationMutation = useAddHourAllocation();
+  const addAllocationSilentMutation = useAddHourAllocationSilent();
   const removeAllocationMutation = useRemoveHourAllocation();
 
   const { capacityInfo, hasOverAllocation } = useDayCapacityInfo(date, allocations, capacities);
@@ -162,6 +166,10 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
       return;
     }
 
+    setIsAutoFilling(true);
+    setAutoFillProgress(0);
+    setAutoFillTotal(remainingCapacity);
+
     try {
       const dateString = format(date, 'yyyy-MM-dd');
       let allocationsAdded = 0;
@@ -199,7 +207,7 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
           );
           
           if (!isAlreadyAllocated) {
-            await addAllocationMutation.mutateAsync({
+            await addAllocationSilentMutation.mutateAsync({
               projectId: selectedProject,
               teamMemberId: memberData.member.id,
               phase: selectedPhase as 'millwork' | 'boxConstruction' | 'stain' | 'install',
@@ -209,6 +217,7 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
 
             memberData.currentAllocations++;
             allocationsAdded++;
+            setAutoFillProgress(allocationsAdded);
           }
         }
       }
@@ -224,7 +233,16 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
       setSelectedTeamMember('');
       setSelectedHourBlocks([]);
     } catch (error) {
-      // Error handled by mutation
+      toast({
+        title: "Auto-Fill Error",
+        description: "Failed to complete auto-fill operation",
+        variant: "destructive",
+      });
+      console.error('Auto-fill error:', error);
+    } finally {
+      setIsAutoFilling(false);
+      setAutoFillProgress(0);
+      setAutoFillTotal(0);
     }
   };
 
@@ -347,7 +365,7 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium">Project</label>
-                    <Select value={selectedProject} onValueChange={setSelectedProject}>
+                    <Select value={selectedProject} onValueChange={setSelectedProject} disabled={isAutoFilling}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select project" />
                       </SelectTrigger>
@@ -363,7 +381,7 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
                   
                   <div>
                     <label className="text-sm font-medium">Phase</label>
-                    <Select value={selectedPhase} onValueChange={setSelectedPhase} disabled={!selectedProject}>
+                    <Select value={selectedPhase} onValueChange={setSelectedPhase} disabled={!selectedProject || isAutoFilling}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select phase" />
                       </SelectTrigger>
@@ -391,11 +409,20 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
                 
                 <Button 
                   onClick={handleAutoFill} 
-                  disabled={!selectedProject || !selectedPhase || eligibleMembers.length === 0 || addAllocationMutation.isPending}
+                  disabled={!selectedProject || !selectedPhase || eligibleMembers.length === 0 || isAutoFilling}
                   className="w-full"
                 >
-                  <Wand2 className="h-4 w-4 mr-2" />
-                  Auto-Fill to Phase Capacity with Eligible Members
+                  {isAutoFilling ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Auto-Filling... ({autoFillProgress}/{autoFillTotal})
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="h-4 w-4 mr-2" />
+                      Auto-Fill to Phase Capacity with Eligible Members
+                    </>
+                  )}
                 </Button>
               </CardContent>
             </Card>
