@@ -63,15 +63,12 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
     return map;
   }, [phaseExceptions]);
 
-  // Get all hour allocations for the month
-  const allMonthAllocations = useMemo(() => {
-    const allAllocations: any[] = [];
-    calendarDays.forEach(day => {
-      // This is a simplified version - in a real implementation you'd want to batch these queries
-      // For now, we'll use a placeholder empty array since we can't call hooks conditionally
-    });
-    return allAllocations;
-  }, [calendarDays]);
+  // Hook to get allocations for each day in the month
+  const dailyAllocationsMap = useMemo(() => {
+    const map = new Map<string, any[]>();
+    // We'll fetch allocations for each day when needed in the component
+    return map;
+  }, []);
 
   const isNonWorkingDay = (date: Date) => {
     const isWeekendDay = isWeekend(date);
@@ -153,7 +150,7 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
               const dayDailyNote = dailyNotesByDate.get(dateString);
               const hasNotes = dayProjectNotes.some(n => n.note) || (dayDailyNote && dayDailyNote.note);
               
-              // Placeholder for capacity issues - would need actual allocation data
+              // Placeholder for capacity issues - would be calculated from actual allocations
               const hasCapacityIssues = false;
               
               return (
