@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -45,7 +44,6 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
 
   const { capacityInfo, hasOverAllocation } = useDayCapacityInfo(date, allocations, capacities);
 
-  // Force refresh capacity data when dialog opens
   React.useEffect(() => {
     if (open) {
       console.log('🔄 Dialog opened, refreshing capacity data...');
@@ -218,34 +216,29 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
       const dateString = format(date, 'yyyy-MM-dd');
       let allocationsAdded = 0;
       
-      // Get current allocations count per member for this date and phase
-      const memberAllocationCounts = eligibleMembers.map(member => ({
-        member,
-        currentAllocations: allocations.filter(alloc => 
+      // Extended to 9 hours: 8 AM to 5 PM
+      const hourBlocks = Array.from({ length: 9 }, (_, i) => i + 8);
+
+      // Fill one person completely before moving to the next
+      for (const member of eligibleMembers) {
+        if (allocationsAdded >= remainingCapacity) break;
+        
+        // Get current allocations for this member on this date/phase/project
+        let memberCurrentAllocations = allocations.filter(alloc => 
           alloc.teamMemberId === member.id && 
           alloc.phase === selectedPhase &&
           alloc.projectId === selectedProject
-        ).length
-      }));
-
-      // Sort by current allocations (ascending) to distribute workload evenly
-      memberAllocationCounts.sort((a, b) => a.currentAllocations - b.currentAllocations);
-
-      // Fill hour blocks until capacity is reached
-      // Extended to 9 hours: 8 AM to 5 PM
-      const hourBlocks = Array.from({ length: 9 }, (_, i) => i + 8);
-      
-      for (const hour of hourBlocks) {
-        if (allocationsAdded >= remainingCapacity) break;
+        ).length;
         
-        for (const memberData of memberAllocationCounts) {
+        // Fill this member's day (up to 9 hours max) before moving to next member
+        for (const hour of hourBlocks) {
           if (allocationsAdded >= remainingCapacity) break;
-          if (memberData.currentAllocations >= 9) continue; // Don't exceed 9 hours per person
+          if (memberCurrentAllocations >= 9) break; // Don't exceed 9 hours per person
           
           // Check if this member is already allocated for this hour/project/phase
           const isAlreadyAllocated = allocations.some(alloc => 
             alloc.hourBlock === hour && 
-            alloc.teamMemberId === memberData.member.id &&
+            alloc.teamMemberId === member.id &&
             alloc.projectId === selectedProject &&
             alloc.phase === selectedPhase
           );
@@ -253,13 +246,13 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
           if (!isAlreadyAllocated) {
             await addAllocationSilentMutation.mutateAsync({
               projectId: selectedProject,
-              teamMemberId: memberData.member.id,
+              teamMemberId: member.id,
               phase: selectedPhase as 'millwork' | 'boxConstruction' | 'stain' | 'install',
               date: dateString,
               hourBlock: hour,
             });
 
-            memberData.currentAllocations++;
+            memberCurrentAllocations++;
             allocationsAdded++;
             setAutoFillProgress(allocationsAdded);
           }
