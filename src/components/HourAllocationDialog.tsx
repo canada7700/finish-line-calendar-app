@@ -1,3 +1,4 @@
+
 import * as React from 'react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -6,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge'; 
 import { Progress } from '@/components/ui/progress';
-import { Trash2, Plus, AlertTriangle } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Trash2, Plus, AlertTriangle, Wand2, CheckSquare, Square } from 'lucide-react';
 import { ProjectPhase } from '../types/project';
 import { useTeamMembers } from '../hooks/useTeamMembers';
 import { useAllProjectAssignments } from '../hooks/useProjectAssignments';
@@ -25,7 +27,7 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
   const [selectedProject, setSelectedProject] = React.useState<string>('');
   const [selectedPhase, setSelectedPhase] = React.useState<string>('');
   const [selectedTeamMember, setSelectedTeamMember] = React.useState<string>('');
-  const [selectedHourBlock, setSelectedHourBlock] = React.useState<string>('');
+  const [selectedHourBlocks, setSelectedHourBlocks] = React.useState<number[]>([]);
 
   const { teamMembers, isLoading: isLoadingTeamMembers } = useTeamMembers();
   const { data: assignments } = useAllProjectAssignments();
@@ -45,26 +47,144 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
     return phases.filter(p => p.projectId === selectedProject).map(p => p.phase);
   }, [phases, selectedProject]);
 
-  const handleAddAllocation = async () => {
-    if (!selectedProject || !selectedPhase || !selectedTeamMember || !selectedHourBlock) {
-      toast({ title: "Missing Information", description: "Please fill in all fields", variant: "destructive" });
+  const getEligibleTeamMembers = React.useCallback((phase: string) => {
+    if (!teamMembers) return [];
+    
+    return teamMembers.filter(member => {
+      if (!member.isActive) return false;
+      
+      switch (phase) {
+        case 'millwork':
+          return member.canDoMillwork;
+        case 'boxConstruction':
+          return member.canDoBoxes;
+        case 'stain':
+          return member.canDoStain;
+        case 'install':
+          return member.canDoInstall;
+        default:
+          return true;
+      }
+    });
+  }, [teamMembers]);
+
+  const getAvailableHourBlocks = React.useCallback(() => {
+    const hourBlocks = Array.from({ length: 8 }, (_, i) => i + 8); // 8 AM to 3 PM
+    const occupiedBlocks = new Set(allocations.map(alloc => alloc.hourBlock));
+    
+    return hourBlocks.map(hour => ({
+      hour,
+      isOccupied: occupiedBlocks.has(hour),
+      label: `${hour}:00 - ${hour + 1}:00`
+    }));
+  }, [allocations]);
+
+  const handleHourBlockToggle = (hour: number, checked: boolean) => {
+    setSelectedHourBlocks(prev => 
+      checked 
+        ? [...prev, hour].sort()
+        : prev.filter(h => h !== hour)
+    );
+  };
+
+  const handleSelectAllAvailable = () => {
+    const availableBlocks = getAvailableHourBlocks()
+      .filter(block => !block.isOccupied)
+      .map(block => block.hour);
+    setSelectedHourBlocks(availableBlocks);
+  };
+
+  const handleClearSelection = () => {
+    setSelectedHourBlocks([]);
+  };
+
+  const handleAutoFill = async () => {
+    if (!selectedProject || !selectedPhase) {
+      toast({ title: "Missing Information", description: "Please select project and phase first", variant: "destructive" });
+      return;
+    }
+
+    const eligibleMembers = getEligibleTeamMembers(selectedPhase);
+    const availableBlocks = getAvailableHourBlocks().filter(block => !block.isOccupied);
+    
+    if (eligibleMembers.length === 0) {
+      toast({ title: "No Eligible Members", description: "No team members are eligible for this phase", variant: "destructive" });
+      return;
+    }
+
+    if (availableBlocks.length === 0) {
+      toast({ title: "No Available Slots", description: "All hour blocks are already occupied", variant: "destructive" });
+      return;
+    }
+
+    // Get current allocations count per member for this date
+    const memberAllocationCounts = eligibleMembers.map(member => ({
+      member,
+      currentAllocations: allocations.filter(alloc => alloc.teamMemberId === member.id).length
+    }));
+
+    // Sort by current allocations (ascending) to distribute workload evenly
+    memberAllocationCounts.sort((a, b) => a.currentAllocations - b.currentAllocations);
+
+    try {
+      const dateString = format(date, 'yyyy-MM-dd');
+      let memberIndex = 0;
+
+      for (const block of availableBlocks) {
+        const selectedMember = memberAllocationCounts[memberIndex % memberAllocationCounts.length];
+        
+        await addAllocationMutation.mutateAsync({
+          projectId: selectedProject,
+          teamMemberId: selectedMember.member.id,
+          phase: selectedPhase as 'millwork' | 'boxConstruction' | 'stain' | 'install',
+          date: dateString,
+          hourBlock: block.hour,
+        });
+
+        // Update the count for this member
+        selectedMember.currentAllocations++;
+        memberIndex++;
+      }
+
+      toast({
+        title: "Auto-Fill Complete",
+        description: `Assigned ${availableBlocks.length} hour blocks to eligible team members`,
+      });
+
+      // Reset form
+      setSelectedProject('');
+      setSelectedPhase('');
+      setSelectedTeamMember('');
+      setSelectedHourBlocks([]);
+    } catch (error) {
+      // Error handled by mutation
+    }
+  };
+
+  const handleAddAllocations = async () => {
+    if (!selectedProject || !selectedPhase || !selectedTeamMember || selectedHourBlocks.length === 0) {
+      toast({ title: "Missing Information", description: "Please fill in all fields and select at least one hour block", variant: "destructive" });
       return;
     }
 
     try {
-      await addAllocationMutation.mutateAsync({
-        projectId: selectedProject,
-        teamMemberId: selectedTeamMember,
-        phase: selectedPhase as 'millwork' | 'boxConstruction' | 'stain' | 'install',
-        date: format(date, 'yyyy-MM-dd'),
-        hourBlock: parseInt(selectedHourBlock),
-      });
+      const dateString = format(date, 'yyyy-MM-dd');
+      
+      for (const hourBlock of selectedHourBlocks) {
+        await addAllocationMutation.mutateAsync({
+          projectId: selectedProject,
+          teamMemberId: selectedTeamMember,
+          phase: selectedPhase as 'millwork' | 'boxConstruction' | 'stain' | 'install',
+          date: dateString,
+          hourBlock: hourBlock,
+        });
+      }
       
       // Reset form
       setSelectedProject('');
       setSelectedPhase('');
       setSelectedTeamMember('');
-      setSelectedHourBlock('');
+      setSelectedHourBlocks([]);
     } catch (error) {
       // Error handled by mutation
     }
@@ -78,11 +198,11 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
     }
   };
 
-  const hourBlocks = Array.from({ length: 8 }, (_, i) => i + 8); // 8 AM to 3 PM (8 hour blocks)
-
   if (!open) return null;
 
   const isLoading = isLoadingTeamMembers || isLoadingAllocations;
+  const availableHourBlocks = getAvailableHourBlocks();
+  const eligibleMembers = selectedPhase ? getEligibleTeamMembers(selectedPhase) : [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -121,10 +241,72 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
             </CardContent>
           </Card>
 
-          {/* Add New Allocation */}
+          {/* Auto-Fill Section */}
           <Card>
             <CardHeader>
-              <CardTitle>Add Hour Allocation</CardTitle>
+              <CardTitle>Quick Auto-Fill</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium">Project</label>
+                  <Select value={selectedProject} onValueChange={setSelectedProject}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select project" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableProjects.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium">Phase</label>
+                  <Select value={selectedPhase} onValueChange={setSelectedPhase} disabled={!selectedProject}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select phase" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availablePhases.map((phase) => (
+                        <SelectItem key={phase} value={phase}>
+                          {phase.charAt(0).toUpperCase() + phase.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              {selectedPhase && (
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <div className="text-sm font-medium mb-2">
+                    Eligible Team Members ({eligibleMembers.length})
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {eligibleMembers.map(member => member.name).join(', ') || 'None available'}
+                  </div>
+                </div>
+              )}
+              
+              <Button 
+                onClick={handleAutoFill} 
+                disabled={!selectedProject || !selectedPhase || eligibleMembers.length === 0 || addAllocationMutation.isPending}
+                className="w-full"
+              >
+                <Wand2 className="h-4 w-4 mr-2" />
+                Auto-Fill Available Slots with Eligible Members
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Manual Assignment */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Manual Hour Allocation</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -160,34 +342,18 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
                   </Select>
                 </div>
                 
-                <div>
+                <div className="col-span-2">
                   <label className="text-sm font-medium">Team Member</label>
                   <Select value={selectedTeamMember} onValueChange={setSelectedTeamMember}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select team member" />
                     </SelectTrigger>
                     <SelectContent>
-                      {teamMembers?.filter(member => member.isActive).map((member) => (
-                        <SelectItem key={member.id} value={member.id}>
-                          {member.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <label className="text-sm font-medium">Hour Block</label>
-                  <Select value={selectedHourBlock} onValueChange={setSelectedHourBlock}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select hour" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {hourBlocks.map((hour) => {
-                        const isOccupied = allocations.some(alloc => alloc.hourBlock === hour);
+                      {teamMembers?.filter(member => member.isActive).map((member) => {
+                        const isEligible = selectedPhase ? getEligibleTeamMembers(selectedPhase).some(em => em.id === member.id) : true;
                         return (
-                          <SelectItem key={hour} value={hour.toString()} disabled={isOccupied}>
-                            {hour}:00 - {hour + 1}:00 {isOccupied ? '(Occupied)' : ''}
+                          <SelectItem key={member.id} value={member.id} disabled={!isEligible}>
+                            {member.name} {!isEligible && '(Not eligible for this phase)'}
                           </SelectItem>
                         );
                       })}
@@ -196,13 +362,60 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
                 </div>
               </div>
               
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <label className="text-sm font-medium">Hour Blocks</label>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSelectAllAvailable}
+                      disabled={availableHourBlocks.every(block => block.isOccupied)}
+                    >
+                      <CheckSquare className="h-3 w-3 mr-1" />
+                      Select All Available
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleClearSelection}
+                      disabled={selectedHourBlocks.length === 0}
+                    >
+                      <Square className="h-3 w-3 mr-1" />
+                      Clear Selection
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2">
+                  {availableHourBlocks.map((block) => (
+                    <div key={block.hour} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`hour-${block.hour}`}
+                        checked={selectedHourBlocks.includes(block.hour)}
+                        onCheckedChange={(checked) => handleHourBlockToggle(block.hour, checked as boolean)}
+                        disabled={block.isOccupied}
+                      />
+                      <label
+                        htmlFor={`hour-${block.hour}`}
+                        className={`text-sm ${block.isOccupied ? 'text-muted-foreground line-through' : 'cursor-pointer'}`}
+                      >
+                        {block.label} {block.isOccupied && '(Occupied)'}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
               <Button 
-                onClick={handleAddAllocation} 
-                disabled={!selectedProject || !selectedPhase || !selectedTeamMember || !selectedHourBlock || addAllocationMutation.isPending}
+                onClick={handleAddAllocations} 
+                disabled={!selectedProject || !selectedPhase || !selectedTeamMember || selectedHourBlocks.length === 0 || addAllocationMutation.isPending}
                 className="w-full"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Add Hour Allocation
+                Add Selected Hour Allocations ({selectedHourBlocks.length})
               </Button>
             </CardContent>
           </Card>
