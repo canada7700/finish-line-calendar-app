@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -8,13 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge'; 
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Trash2, Plus, AlertTriangle, Wand2, CheckSquare, Square, Users } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Trash2, Plus, AlertTriangle, Wand2, CheckSquare, Square, Users, Grid3X3, List } from 'lucide-react';
 import { ProjectPhase } from '../types/project';
 import { useTeamMembers } from '../hooks/useTeamMembers';
 import { useAllProjectAssignments } from '../hooks/useProjectAssignments';
 import { useDailyHourAllocations, useAddHourAllocation, useRemoveHourAllocation } from '../hooks/useDailyHourAllocations';
 import { useDailyPhaseCapacities, useDayCapacityInfo } from '../hooks/useDailyCapacities';
 import { toast } from '@/hooks/use-toast';
+import HourAllocationGrid from './HourAllocationGrid';
 
 interface HourAllocationDialogProps {
   date: Date;
@@ -28,6 +29,7 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
   const [selectedPhase, setSelectedPhase] = React.useState<string>('');
   const [selectedTeamMember, setSelectedTeamMember] = React.useState<string>('');
   const [selectedHourBlocks, setSelectedHourBlocks] = React.useState<number[]>([]);
+  const [viewMode, setViewMode] = React.useState<'grid' | 'list'>('grid');
 
   const { teamMembers, isLoading: isLoadingTeamMembers } = useTeamMembers();
   const { data: assignments } = useAllProjectAssignments();
@@ -69,7 +71,8 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
   }, [teamMembers]);
 
   const getHourBlockOccupancy = React.useCallback(() => {
-    const hourBlocks = Array.from({ length: 8 }, (_, i) => i + 8); // 8 AM to 3 PM
+    // Extended to 9 hours: 8 AM to 5 PM
+    const hourBlocks = Array.from({ length: 9 }, (_, i) => i + 8);
     
     return hourBlocks.map(hour => {
       const allocationsForHour = allocations.filter(alloc => alloc.hourBlock === hour);
@@ -89,7 +92,8 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
   const getAvailableHourBlocks = React.useCallback(() => {
     if (!selectedTeamMember) return [];
     
-    const hourBlocks = Array.from({ length: 8 }, (_, i) => i + 8); // 8 AM to 3 PM
+    // Extended to 9 hours: 8 AM to 5 PM
+    const hourBlocks = Array.from({ length: 9 }, (_, i) => i + 8);
     
     return hourBlocks.map(hour => {
       // Check if this specific team member is already allocated for this hour on this project/phase
@@ -176,14 +180,15 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
       memberAllocationCounts.sort((a, b) => a.currentAllocations - b.currentAllocations);
 
       // Fill hour blocks until capacity is reached
-      const hourBlocks = Array.from({ length: 8 }, (_, i) => i + 8); // 8 AM to 3 PM
+      // Extended to 9 hours: 8 AM to 5 PM
+      const hourBlocks = Array.from({ length: 9 }, (_, i) => i + 8);
       
       for (const hour of hourBlocks) {
         if (allocationsAdded >= remainingCapacity) break;
         
         for (const memberData of memberAllocationCounts) {
           if (allocationsAdded >= remainingCapacity) break;
-          if (memberData.currentAllocations >= 8) continue; // Don't exceed 8 hours per person
+          if (memberData.currentAllocations >= 9) continue; // Don't exceed 9 hours per person
           
           // Check if this member is already allocated for this hour/project/phase
           const isAlreadyAllocated = allocations.some(alloc => 
@@ -269,282 +274,324 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[1200px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Hour Allocations for {format(date, 'MMMM d, yyyy')}</DialogTitle>
           <DialogDescription>
-            Assign team members to specific hour blocks for different project phases. Multiple team members can work during the same time periods.
+            Assign team members to specific hour blocks for different project phases. Work day is 8 AM to 5 PM.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6">
-          {/* Capacity Overview */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                Daily Capacity Overview
-                {hasOverAllocation && <AlertTriangle className="h-5 w-5 text-red-500" />}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {capacityInfo.map((info) => (
-                <div key={info.phase} className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium capitalize">{info.phase}</span>
-                    <Badge variant={info.isOverAllocated ? "destructive" : "secondary"}>
-                      {info.allocated}/{info.capacity} hours
-                    </Badge>
-                  </div>
-                  <Progress 
-                    value={(info.allocated / info.capacity) * 100} 
-                    className={`h-2 ${info.isOverAllocated ? 'bg-red-100' : ''}`}
-                  />
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+        <Tabs defaultValue="overview" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="assign">Assign Hours</TabsTrigger>
+            <TabsTrigger value="allocations">Current Allocations</TabsTrigger>
+          </TabsList>
 
-          {/* Hour Block Overview */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Hour Block Occupancy</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-4 gap-2">
-                {hourBlockOccupancy.map((block) => (
-                  <div key={block.hour} className="p-2 border rounded text-center">
-                    <div className="text-sm font-medium">{block.label}</div>
-                    <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                      <Users className="h-3 w-3" />
-                      {block.uniqueTeamMembers} people
+          <TabsContent value="overview" className="space-y-4">
+            {/* Capacity Overview */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  Daily Capacity Overview
+                  {hasOverAllocation && <AlertTriangle className="h-5 w-5 text-red-500" />}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {capacityInfo.map((info) => (
+                  <div key={info.phase} className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium capitalize">{info.phase}</span>
+                      <Badge variant={info.isOverAllocated ? "destructive" : "secondary"}>
+                        {info.allocated}/{info.capacity} hours
+                      </Badge>
                     </div>
+                    <Progress 
+                      value={(info.allocated / info.capacity) * 100} 
+                      className={`h-2 ${info.isOverAllocated ? 'bg-red-100' : ''}`}
+                    />
                   </div>
                 ))}
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          {/* Auto-Fill Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Auto-Fill</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium">Project</label>
-                  <Select value={selectedProject} onValueChange={setSelectedProject}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select project" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableProjects.map((project) => (
-                        <SelectItem key={project.id} value={project.id}>
-                          {project.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <label className="text-sm font-medium">Phase</label>
-                  <Select value={selectedPhase} onValueChange={setSelectedPhase} disabled={!selectedProject}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select phase" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availablePhases.map((phase) => (
-                        <SelectItem key={phase} value={phase}>
-                          {phase.charAt(0).toUpperCase() + phase.slice(1)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              {selectedPhase && (
-                <div className="p-3 bg-muted/50 rounded-lg">
-                  <div className="text-sm font-medium mb-2">
-                    Eligible Team Members ({eligibleMembers.length})
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {eligibleMembers.map(member => member.name).join(', ') || 'None available'}
-                  </div>
-                </div>
-              )}
-              
-              <Button 
-                onClick={handleAutoFill} 
-                disabled={!selectedProject || !selectedPhase || eligibleMembers.length === 0 || addAllocationMutation.isPending}
-                className="w-full"
-              >
-                <Wand2 className="h-4 w-4 mr-2" />
-                Auto-Fill to Phase Capacity with Eligible Members
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Manual Assignment */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Manual Hour Allocation</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium">Project</label>
-                  <Select value={selectedProject} onValueChange={setSelectedProject}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select project" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableProjects.map((project) => (
-                        <SelectItem key={project.id} value={project.id}>
-                          {project.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <label className="text-sm font-medium">Phase</label>
-                  <Select value={selectedPhase} onValueChange={setSelectedPhase} disabled={!selectedProject}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select phase" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availablePhases.map((phase) => (
-                        <SelectItem key={phase} value={phase}>
-                          {phase.charAt(0).toUpperCase() + phase.slice(1)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="col-span-2">
-                  <label className="text-sm font-medium">Team Member</label>
-                  <Select value={selectedTeamMember} onValueChange={setSelectedTeamMember}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select team member" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {teamMembers?.filter(member => member.isActive).map((member) => {
-                        const isEligible = selectedPhase ? getEligibleTeamMembers(selectedPhase).some(em => em.id === member.id) : true;
-                        return (
-                          <SelectItem key={member.id} value={member.id} disabled={!isEligible}>
-                            {member.name} {!isEligible && '(Not eligible for this phase)'}
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              {selectedTeamMember && selectedProject && selectedPhase && (
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <label className="text-sm font-medium">Hour Blocks</label>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleSelectAllAvailable}
-                        disabled={availableHourBlocks.every(block => block.isAlreadyAllocated)}
-                      >
-                        <CheckSquare className="h-3 w-3 mr-1" />
-                        Select All Available
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleClearSelection}
-                        disabled={selectedHourBlocks.length === 0}
-                      >
-                        <Square className="h-3 w-3 mr-1" />
-                        Clear Selection
-                      </Button>
+            {/* Hour Block Overview */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Hour Block Occupancy (8 AM - 5 PM)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-2">
+                  {hourBlockOccupancy.map((block) => (
+                    <div key={block.hour} className="p-2 border rounded text-center">
+                      <div className="text-sm font-medium">{block.label}</div>
+                      <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                        <Users className="h-3 w-3" />
+                        {block.uniqueTeamMembers} people
+                      </div>
                     </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="assign" className="space-y-4">
+            {/* Auto-Fill Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Quick Auto-Fill</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Project</label>
+                    <Select value={selectedProject} onValueChange={setSelectedProject}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select project" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableProjects.map((project) => (
+                          <SelectItem key={project.id} value={project.id}>
+                            {project.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-2">
-                    {availableHourBlocks.map((block) => (
-                      <div key={block.hour} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`hour-${block.hour}`}
-                          checked={selectedHourBlocks.includes(block.hour)}
-                          onCheckedChange={(checked) => handleHourBlockToggle(block.hour, checked as boolean)}
-                          disabled={block.isAlreadyAllocated}
-                        />
-                        <label
-                          htmlFor={`hour-${block.hour}`}
-                          className={`text-sm ${block.isAlreadyAllocated ? 'text-muted-foreground line-through' : 'cursor-pointer'}`}
-                        >
-                          {block.label} {block.isAlreadyAllocated && '(Already allocated)'}
-                        </label>
-                      </div>
-                    ))}
+                  <div>
+                    <label className="text-sm font-medium">Phase</label>
+                    <Select value={selectedPhase} onValueChange={setSelectedPhase} disabled={!selectedProject}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select phase" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availablePhases.map((phase) => (
+                          <SelectItem key={phase} value={phase}>
+                            {phase.charAt(0).toUpperCase() + phase.slice(1)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
-              )}
-              
-              <Button 
-                onClick={handleAddAllocations} 
-                disabled={!selectedProject || !selectedPhase || !selectedTeamMember || selectedHourBlocks.length === 0 || addAllocationMutation.isPending}
-                className="w-full"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Selected Hour Allocations ({selectedHourBlocks.length})
-              </Button>
-            </CardContent>
-          </Card>
+                
+                {selectedPhase && (
+                  <div className="p-3 bg-muted/50 rounded-lg">
+                    <div className="text-sm font-medium mb-2">
+                      Eligible Team Members ({eligibleMembers.length})
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {eligibleMembers.map(member => member.name).join(', ') || 'None available'}
+                    </div>
+                  </div>
+                )}
+                
+                <Button 
+                  onClick={handleAutoFill} 
+                  disabled={!selectedProject || !selectedPhase || eligibleMembers.length === 0 || addAllocationMutation.isPending}
+                  className="w-full"
+                >
+                  <Wand2 className="h-4 w-4 mr-2" />
+                  Auto-Fill to Phase Capacity with Eligible Members
+                </Button>
+              </CardContent>
+            </Card>
 
-          {/* Current Allocations */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Current Hour Allocations</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div>Loading allocations...</div>
-              ) : allocations.length === 0 ? (
-                <p className="text-muted-foreground">No hour allocations for this day.</p>
-              ) : (
-                <div className="space-y-2">
-                  {allocations
-                    .sort((a, b) => a.hourBlock - b.hourBlock)
-                    .map((allocation) => (
-                      <div key={allocation.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex items-center gap-4">
-                          <div className="font-medium">
-                            {allocation.hourBlock}:00 - {allocation.hourBlock + 1}:00
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {allocation.teamMember?.name} - {allocation.project?.jobName} ({allocation.phase})
-                          </div>
-                        </div>
+            {/* Manual Assignment */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Manual Hour Allocation</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Project</label>
+                    <Select value={selectedProject} onValueChange={setSelectedProject}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select project" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableProjects.map((project) => (
+                          <SelectItem key={project.id} value={project.id}>
+                            {project.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium">Phase</label>
+                    <Select value={selectedPhase} onValueChange={setSelectedPhase} disabled={!selectedProject}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select phase" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availablePhases.map((phase) => (
+                          <SelectItem key={phase} value={phase}>
+                            {phase.charAt(0).toUpperCase() + phase.slice(1)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="col-span-2">
+                    <label className="text-sm font-medium">Team Member</label>
+                    <Select value={selectedTeamMember} onValueChange={setSelectedTeamMember}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select team member" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {teamMembers?.filter(member => member.isActive).map((member) => {
+                          const isEligible = selectedPhase ? getEligibleTeamMembers(selectedPhase).some(em => em.id === member.id) : true;
+                          return (
+                            <SelectItem key={member.id} value={member.id} disabled={!isEligible}>
+                              {member.name} {!isEligible && '(Not eligible for this phase)'}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                {selectedTeamMember && selectedProject && selectedPhase && (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="text-sm font-medium">Hour Blocks</label>
+                      <div className="flex gap-2">
                         <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteAllocation(allocation.id)}
-                          disabled={removeAllocationMutation.isPending}
-                          className="text-muted-foreground hover:text-destructive"
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleSelectAllAvailable}
+                          disabled={availableHourBlocks.every(block => block.isAlreadyAllocated)}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <CheckSquare className="h-3 w-3 mr-1" />
+                          Select All Available
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleClearSelection}
+                          disabled={selectedHourBlocks.length === 0}
+                        >
+                          <Square className="h-3 w-3 mr-1" />
+                          Clear Selection
                         </Button>
                       </div>
-                    ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-2">
+                      {availableHourBlocks.map((block) => (
+                        <div key={block.hour} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`hour-${block.hour}`}
+                            checked={selectedHourBlocks.includes(block.hour)}
+                            onCheckedChange={(checked) => handleHourBlockToggle(block.hour, checked as boolean)}
+                            disabled={block.isAlreadyAllocated}
+                          />
+                          <label
+                            htmlFor={`hour-${block.hour}`}
+                            className={`text-sm ${block.isAlreadyAllocated ? 'text-muted-foreground line-through' : 'cursor-pointer'}`}
+                          >
+                            {block.label} {block.isAlreadyAllocated && '(Already allocated)'}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <Button 
+                  onClick={handleAddAllocations} 
+                  disabled={!selectedProject || !selectedPhase || !selectedTeamMember || selectedHourBlocks.length === 0 || addAllocationMutation.isPending}
+                  className="w-full"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Selected Hour Allocations ({selectedHourBlocks.length})
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="allocations" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Current Allocations</h3>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={viewMode === 'grid' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setViewMode('grid')}
+                >
+                  <Grid3X3 className="h-4 w-4 mr-2" />
+                  Grid View
+                </Button>
+                <Button
+                  variant={viewMode === 'list' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setViewMode('list')}
+                >
+                  <List className="h-4 w-4 mr-2" />
+                  List View
+                </Button>
+              </div>
+            </div>
+
+            {isLoading ? (
+              <div>Loading allocations...</div>
+            ) : viewMode === 'grid' ? (
+              <HourAllocationGrid
+                allocations={allocations}
+                date={date}
+                onDeleteAllocation={handleDeleteAllocation}
+                isDeleting={removeAllocationMutation.isPending}
+              />
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Detailed List View</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {allocations.length === 0 ? (
+                    <p className="text-muted-foreground">No hour allocations for this day.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {allocations
+                        .sort((a, b) => a.hourBlock - b.hourBlock)
+                        .map((allocation) => (
+                          <div key={allocation.id} className="flex items-center justify-between p-3 border rounded-lg">
+                            <div className="flex items-center gap-4">
+                              <div className="font-medium">
+                                {allocation.hourBlock}:00 - {allocation.hourBlock + 1}:00
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {allocation.teamMember?.name} - {allocation.project?.jobName} ({allocation.phase})
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteAllocation(allocation.id)}
+                              disabled={removeAllocationMutation.isPending}
+                              className="text-muted-foreground hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
