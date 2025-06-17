@@ -15,6 +15,21 @@ interface HourAllocationGridProps {
   isDeleting: boolean;
 }
 
+const getPhaseColor = (phase: string) => {
+  switch (phase) {
+    case 'millwork':
+      return 'bg-purple-500 text-white hover:bg-purple-600';
+    case 'boxConstruction':
+      return 'bg-blue-500 text-white hover:bg-blue-600';
+    case 'stain':
+      return 'bg-amber-500 text-white hover:bg-amber-600';
+    case 'install':
+      return 'bg-green-500 text-white hover:bg-green-600';
+    default:
+      return 'bg-gray-500 text-white hover:bg-gray-600';
+  }
+};
+
 const HourAllocationGrid = ({ allocations, date, onDeleteAllocation, isDeleting }: HourAllocationGridProps) => {
   const { teamMembers } = useTeamMembers();
   
@@ -93,8 +108,7 @@ const HourAllocationGrid = ({ allocations, date, onDeleteAllocation, isDeleting 
                               {hourAllocations.map(allocation => (
                                 <div key={allocation.id} className="relative group">
                                   <Badge
-                                    variant="secondary"
-                                    className="text-xs px-2 py-1 block"
+                                    className={`text-xs px-2 py-1 block ${getPhaseColor(allocation.phase)}`}
                                     title={`${allocation.project?.jobName} - ${allocation.phase.toUpperCase()}`}
                                   >
                                     <div className="truncate max-w-[80px]">
