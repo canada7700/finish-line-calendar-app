@@ -364,7 +364,7 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[1200px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>Hour Allocations for {format(date, 'MMMM d, yyyy')}</span>
@@ -428,10 +428,10 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
                 <div className="grid grid-cols-3 gap-2">
                   {hourBlockOccupancy.map((block) => (
                     <div key={block.hour} className="p-2 border rounded text-center">
-                      <div className="text-sm font-medium">{block.label}</div>
+                      <div className="text-sm font-medium">{block.hour}:00</div>
                       <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
                         <Users className="h-3 w-3" />
-                        {block.uniqueTeamMembers} people
+                        {block.uniqueTeamMembers}
                       </div>
                     </div>
                   ))}
@@ -678,7 +678,7 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
                             htmlFor={`hour-${block.hour}`}
                             className={`text-sm ${block.isAlreadyAllocated ? 'text-muted-foreground line-through' : 'cursor-pointer'}`}
                           >
-                            {block.label} {block.isAlreadyAllocated && '(Conflicts exist)'}
+                            {block.hour}:00 {block.isAlreadyAllocated && '(Conflicts)'}
                           </label>
                         </div>
                       ))}

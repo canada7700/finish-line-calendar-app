@@ -78,15 +78,15 @@ const HourAllocationGrid = ({ allocations, date, onDeleteAllocation, isDeleting 
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
+          <table className="w-full border-collapse text-sm">
             <thead>
               <tr>
-                <th className="text-left p-2 border-b font-medium sticky left-0 bg-background min-w-[120px]">
+                <th className="text-left p-1 border-b font-medium sticky left-0 bg-background min-w-[100px] text-xs">
                   Team Member
                 </th>
                 {hourBlocks.map(hour => (
-                  <th key={hour} className="text-center p-2 border-b font-medium min-w-[100px]">
-                    {hour}:00
+                  <th key={hour} className="text-center p-1 border-b font-medium min-w-[70px] text-xs">
+                    {hour}
                   </th>
                 ))}
               </tr>
@@ -96,32 +96,32 @@ const HourAllocationGrid = ({ allocations, date, onDeleteAllocation, isDeleting 
                 const memberAllocations = allocationMap.get(member.id);
                 return (
                   <tr key={member.id} className="border-b hover:bg-muted/50">
-                    <td className="p-2 font-medium sticky left-0 bg-background border-r">
+                    <td className="p-1 font-medium sticky left-0 bg-background border-r text-xs">
                       {member.name}
                     </td>
                     {hourBlocks.map(hour => {
                       const hourAllocations = memberAllocations?.get(hour) || [];
                       return (
-                        <td key={hour} className="p-1 text-center align-top">
+                        <td key={hour} className="p-0.5 text-center align-top">
                           {hourAllocations.length > 0 && (
-                            <div className="space-y-1">
+                            <div className="space-y-0.5">
                               {hourAllocations.map(allocation => (
                                 <div key={allocation.id} className="relative group">
                                   <Badge
-                                    className={`text-xs px-2 py-1 block ${getPhaseColor(allocation.phase)}`}
+                                    className={`text-[10px] px-1 py-0.5 block cursor-pointer ${getPhaseColor(allocation.phase)}`}
                                     title={`${allocation.project?.jobName} - ${allocation.phase.toUpperCase()}`}
                                   >
-                                    <div className="truncate max-w-[80px]">
+                                    <div className="truncate max-w-[60px]">
                                       {allocation.project?.jobName}
                                     </div>
-                                    <div className="text-[10px] opacity-75">
-                                      {allocation.phase.toUpperCase()}
+                                    <div className="text-[8px] opacity-75">
+                                      {allocation.phase.slice(0, 3).toUpperCase()}
                                     </div>
                                   </Badge>
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="absolute -top-1 -right-1 h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    className="absolute -top-0.5 -right-0.5 h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity p-0"
                                     onClick={() => onDeleteAllocation(allocation.id)}
                                     disabled={isDeleting}
                                   >
