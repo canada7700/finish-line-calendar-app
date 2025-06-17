@@ -346,7 +346,6 @@ export class ProjectScheduler {
       console.log(`🔨 Generating millwork phases for ${millworkDuration} working days starting ${format(millworkStartDate, 'yyyy-MM-dd')}`);
       
       let currentDate = new Date(millworkStartDate);
-      const hoursPerDay = millworkDuration > 0 ? Math.ceil(project.millworkHrs / millworkDuration) : 0;
       
       for (let day = 0; day < millworkDuration; day++) {
         while (!this.isWorkingDay(currentDate)) {
@@ -360,11 +359,11 @@ export class ProjectScheduler {
           phase: 'millwork',
           startDate: format(currentDate, 'yyyy-MM-dd'),
           endDate: format(currentDate, 'yyyy-MM-dd'),
-          hours: hoursPerDay,
+          hours: phaseCapacities.millwork, // Use actual daily capacity
           color: 'bg-purple-500'
         });
         
-        console.log(`✅ Created millwork phase for ${format(currentDate, 'yyyy-MM-dd')}`);
+        console.log(`✅ Created millwork phase for ${format(currentDate, 'yyyy-MM-dd')} with ${phaseCapacities.millwork}h capacity`);
         currentDate = this.getNextWorkingDay(currentDate);
       }
     }
@@ -377,7 +376,6 @@ export class ProjectScheduler {
       console.log(`🔨 Generating box construction phases for ${boxConstructionDuration} working days starting ${format(boxConstructionStartDate, 'yyyy-MM-dd')}`);
       
       let currentDate = new Date(boxConstructionStartDate);
-      const hoursPerDay = boxConstructionDuration > 0 ? Math.ceil(project.boxConstructionHrs / boxConstructionDuration) : 0;
       
       for (let day = 0; day < boxConstructionDuration; day++) {
         while (!this.isWorkingDay(currentDate)) {
@@ -391,11 +389,11 @@ export class ProjectScheduler {
           phase: 'boxConstruction',
           startDate: format(currentDate, 'yyyy-MM-dd'),
           endDate: format(currentDate, 'yyyy-MM-dd'),
-          hours: hoursPerDay,
+          hours: phaseCapacities.boxConstruction, // Use actual daily capacity
           color: 'bg-blue-500'
         });
         
-        console.log(`✅ Created box construction phase for ${format(currentDate, 'yyyy-MM-dd')}`);
+        console.log(`✅ Created box construction phase for ${format(currentDate, 'yyyy-MM-dd')} with ${phaseCapacities.boxConstruction}h capacity`);
         currentDate = this.getNextWorkingDay(currentDate);
       }
     }
@@ -408,7 +406,6 @@ export class ProjectScheduler {
       console.log(`🎨 Generating stain phases for ${stainDuration} working days starting ${format(stainStartDate, 'yyyy-MM-dd')}`);
       
       let currentDate = new Date(stainStartDate);
-      const hoursPerDay = stainDuration > 0 ? Math.ceil(project.stainHrs / stainDuration) : 0;
       
       for (let day = 0; day < stainDuration; day++) {
         while (!this.isWorkingDay(currentDate)) {
@@ -421,12 +418,12 @@ export class ProjectScheduler {
           projectName: project.jobName,
           phase: 'stain',
           startDate: format(currentDate, 'yyyy-MM-dd'),
-          endDate: format(currentDate, 'yyyy-MM-dd'), // Single day phase
-          hours: hoursPerDay,
+          endDate: format(currentDate, 'yyyy-MM-dd'),
+          hours: phaseCapacities.stain, // Use actual daily capacity
           color: 'bg-amber-500'
         });
         
-        console.log(`✅ Created stain phase for ${format(currentDate, 'yyyy-MM-dd')}`);
+        console.log(`✅ Created stain phase for ${format(currentDate, 'yyyy-MM-dd')} with ${phaseCapacities.stain}h capacity`);
         currentDate = this.getNextWorkingDay(currentDate);
       }
     }
@@ -438,7 +435,6 @@ export class ProjectScheduler {
     console.log(`🔧 Generating install phases for ${installDuration} working days starting ${format(installStartDate, 'yyyy-MM-dd')}`);
     
     let currentDate = new Date(installStartDate);
-    const hoursPerDay = installDuration > 0 ? Math.ceil(project.installHrs / installDuration) : 0;
     
     for (let day = 0; day < installDuration; day++) {
       while (!this.isWorkingDay(currentDate)) {
@@ -451,12 +447,12 @@ export class ProjectScheduler {
         projectName: project.jobName,
         phase: 'install',
         startDate: format(currentDate, 'yyyy-MM-dd'),
-        endDate: format(currentDate, 'yyyy-MM-dd'), // Single day phase
-        hours: hoursPerDay,
+        endDate: format(currentDate, 'yyyy-MM-dd'),
+        hours: phaseCapacities.install, // Use actual daily capacity
         color: 'bg-green-500'
       });
       
-      console.log(`✅ Created install phase for ${format(currentDate, 'yyyy-MM-dd')}`);
+      console.log(`✅ Created install phase for ${format(currentDate, 'yyyy-MM-dd')} with ${phaseCapacities.install}h capacity`);
       currentDate = this.getNextWorkingDay(currentDate);
     }
     
