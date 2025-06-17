@@ -1,235 +1,252 @@
-
 import * as React from 'react';
+import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { format } from 'date-fns';
-import { Plus, Trash2, AlertTriangle } from 'lucide-react';
-import { useTeamMembers } from '@/hooks/useTeamMembers';
-import { useDailyHourAllocations, useAddHourAllocation, useRemoveHourAllocation } from '@/hooks/useDailyHourAllocations';
-import { useDailyPhaseCapacities, useDayCapacityInfo } from '@/hooks/useDailyCapacities';
-import { ProjectPhase, TeamMember, DailyHourAllocation } from '@/types/project';
+import { Badge } from '@/components/ui/badge'; 
+import { Progress } from '@/components/ui/progress';
+import { Trash2, Plus, AlertTriangle } from 'lucide-react';
+import { ProjectPhase } from '../types/project';
+import { useTeamMembers } from '../hooks/useTeamMembers';
+import { useAllProjectAssignments } from '../hooks/useProjectAssignments';
+import { useDailyHourAllocations, useAddHourAllocation, useDeleteHourAllocation } from '../hooks/useDailyHourAllocations';
+import { useDailyPhaseCapacities, useDayCapacityInfo } from '../hooks/useDailyCapacities';
+import { toast } from '@/hooks/use-toast';
 
 interface HourAllocationDialogProps {
-  date: Date | null;
+  date: Date;
   phases: ProjectPhase[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocationDialogProps) => {
-  const [selectedProject, setSelectedProject] = React.useState('');
-  const [selectedPhase, setSelectedPhase] = React.useState<'millwork' | 'boxConstruction' | 'stain' | 'install'>('millwork');
-  const [selectedTeamMember, setSelectedTeamMember] = React.useState('');
-  const [selectedHourBlock, setSelectedHourBlock] = React.useState(8);
+  const [selectedProject, setSelectedProject] = React.useState<string>('');
+  const [selectedPhase, setSelectedPhase] = React.useState<string>('');
+  const [selectedTeamMember, setSelectedTeamMember] = React.useState<string>('');
+  const [selectedHourBlock, setSelectedHourBlock] = React.useState<string>('');
 
-  const { data: teamMembers = [] } = useTeamMembers();
-  const { data: allocations = [] } = useDailyHourAllocations(date || undefined);
+  const { teamMembers, isLoading: isLoadingTeamMembers } = useTeamMembers();
+  const { data: assignments } = useAllProjectAssignments();
+  const { data: allocations = [], isLoading: isLoadingAllocations } = useDailyHourAllocations(date);
   const { data: capacities = [] } = useDailyPhaseCapacities();
   const addAllocationMutation = useAddHourAllocation();
-  const removeAllocationMutation = useRemoveHourAllocation();
+  const deleteAllocationMutation = useDeleteHourAllocation();
 
-  const capacityInfo = date ? useDayCapacityInfo(date, allocations, capacities) : null;
+  const { capacityInfo, hasOverAllocation } = useDayCapacityInfo(date, allocations, capacities);
 
-  const projectsOnDay = Array.from(new Map(phases.map(p => [p.projectId, p])).values());
-  const availableHourBlocks = Array.from({ length: 24 }, (_, i) => i);
-  const occupiedBlocks = new Set(allocations.map(a => a.hourBlock));
+  const availableProjects = React.useMemo(() => {
+    return Array.from(new Map(phases.map(p => [p.projectId, { id: p.projectId, name: p.projectName }])).values());
+  }, [phases]);
 
-  const getEligibleTeamMembers = (phase: string): TeamMember[] => {
-    return teamMembers.filter(member => {
-      if (!member.isActive) return false;
-      switch (phase) {
-        case 'millwork': return member.canDoMillwork;
-        case 'boxConstruction': return member.canDoBoxes;
-        case 'stain': return member.canDoStain;
-        case 'install': return member.canDoInstall;
-        default: return false;
-      }
-    });
-  };
+  const availablePhases = React.useMemo(() => {
+    if (!selectedProject) return [];
+    return phases.filter(p => p.projectId === selectedProject).map(p => p.phase);
+  }, [phases, selectedProject]);
 
   const handleAddAllocation = async () => {
-    if (!date || !selectedProject || !selectedTeamMember) return;
+    if (!selectedProject || !selectedPhase || !selectedTeamMember || !selectedHourBlock) {
+      toast({ title: "Missing Information", description: "Please fill in all fields", variant: "destructive" });
+      return;
+    }
 
-    await addAllocationMutation.mutateAsync({
-      projectId: selectedProject,
-      teamMemberId: selectedTeamMember,
-      phase: selectedPhase,
-      date: format(date, 'yyyy-MM-dd'),
-      hourBlock: selectedHourBlock,
-    });
-
-    // Reset form
-    setSelectedProject('');
-    setSelectedTeamMember('');
-    setSelectedHourBlock(8);
-  };
-
-  const handleRemoveAllocation = async (allocationId: string) => {
-    await removeAllocationMutation.mutateAsync(allocationId);
-  };
-
-  const getPhaseColor = (phase: string) => {
-    switch (phase) {
-      case 'millwork': return 'bg-blue-500';
-      case 'boxConstruction': return 'bg-green-500';
-      case 'stain': return 'bg-purple-500';
-      case 'install': return 'bg-orange-500';
-      default: return 'bg-gray-500';
+    try {
+      await addAllocationMutation.mutateAsync({
+        projectId: selectedProject,
+        teamMemberId: selectedTeamMember,
+        phase: selectedPhase as 'millwork' | 'boxConstruction' | 'stain' | 'install',
+        date: format(date, 'yyyy-MM-dd'),
+        hourBlock: parseInt(selectedHourBlock),
+      });
+      
+      // Reset form
+      setSelectedProject('');
+      setSelectedPhase('');
+      setSelectedTeamMember('');
+      setSelectedHourBlock('');
+    } catch (error) {
+      // Error handled by mutation
     }
   };
 
-  if (!date) return null;
+  const handleDeleteAllocation = async (allocationId: string) => {
+    try {
+      await deleteAllocationMutation.mutateAsync(allocationId);
+    } catch (error) {
+      // Error handled by mutation
+    }
+  };
+
+  const hourBlocks = Array.from({ length: 8 }, (_, i) => i + 8); // 8 AM to 3 PM (8 hour blocks)
+
+  if (!open) return null;
+
+  const isLoading = isLoadingTeamMembers || isLoadingAllocations;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Hour Allocations for {format(date, 'MMMM d, yyyy')}</DialogTitle>
           <DialogDescription>
-            Manage team member assignments by hour blocks for this day.
+            Assign team members to specific hour blocks for different project phases.
           </DialogDescription>
         </DialogHeader>
 
-        {/* Capacity Overview */}
-        {capacityInfo && (
-          <Card className="mb-4">
+        <div className="space-y-6">
+          {/* Capacity Overview */}
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 Daily Capacity Overview
-                {capacityInfo.hasOverAllocation && <AlertTriangle className="h-5 w-5 text-red-500" />}
+                {hasOverAllocation && <AlertTriangle className="h-5 w-5 text-red-500" />}
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {capacityInfo.capacityInfo.map(info => (
-                  <div key={info.phase} className="text-center">
-                    <div className={`text-sm font-medium mb-1 ${info.isOverAllocated ? 'text-red-600' : 'text-gray-600'}`}>
-                      {info.phase.toUpperCase()}
-                    </div>
-                    <Badge variant={info.isOverAllocated ? 'destructive' : 'secondary'}>
-                      {info.allocated}/{info.capacity}h
+            <CardContent className="space-y-4">
+              {capacityInfo.map((info) => (
+                <div key={info.phase} className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium capitalize">{info.phase}</span>
+                    <Badge variant={info.isOverAllocated ? "destructive" : "secondary"}>
+                      {info.allocated}/{info.capacity} hours
                     </Badge>
                   </div>
-                ))}
-              </div>
+                  <Progress 
+                    value={(info.allocated / info.capacity) * 100} 
+                    className={`h-2 ${info.isOverAllocated ? 'bg-red-100' : ''}`}
+                  />
+                </div>
+              ))}
             </CardContent>
           </Card>
-        )}
 
-        {/* Add New Allocation */}
-        <Card className="mb-4">
-          <CardHeader>
-            <CardTitle>Add Hour Allocation</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <Select value={selectedProject} onValueChange={setSelectedProject}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Project" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projectsOnDay.map(project => (
-                    <SelectItem key={project.projectId} value={project.projectId}>
-                      {project.projectName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={selectedPhase} onValueChange={(value: any) => setSelectedPhase(value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Phase" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="millwork">Millwork</SelectItem>
-                  <SelectItem value="boxConstruction">Boxes</SelectItem>
-                  <SelectItem value="stain">Stain</SelectItem>
-                  <SelectItem value="install">Install</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={selectedTeamMember} onValueChange={setSelectedTeamMember}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Team Member" />
-                </SelectTrigger>
-                <SelectContent>
-                  {getEligibleTeamMembers(selectedPhase).map(member => (
-                    <SelectItem key={member.id} value={member.id}>
-                      {member.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={selectedHourBlock.toString()} onValueChange={(value) => setSelectedHourBlock(parseInt(value))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Hour" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableHourBlocks.map(hour => (
-                    <SelectItem 
-                      key={hour} 
-                      value={hour.toString()}
-                      disabled={occupiedBlocks.has(hour)}
-                    >
-                      {hour}:00 {occupiedBlocks.has(hour) ? '(Occupied)' : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
+          {/* Add New Allocation */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Add Hour Allocation</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium">Project</label>
+                  <Select value={selectedProject} onValueChange={setSelectedProject}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select project" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableProjects.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium">Phase</label>
+                  <Select value={selectedPhase} onValueChange={setSelectedPhase} disabled={!selectedProject}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select phase" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availablePhases.map((phase) => (
+                        <SelectItem key={phase} value={phase}>
+                          {phase.charAt(0).toUpperCase() + phase.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium">Team Member</label>
+                  <Select value={selectedTeamMember} onValueChange={setSelectedTeamMember}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select team member" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {teamMembers?.filter(member => member.isActive).map((member) => (
+                        <SelectItem key={member.id} value={member.id}>
+                          {member.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium">Hour Block</label>
+                  <Select value={selectedHourBlock} onValueChange={setSelectedHourBlock}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select hour" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {hourBlocks.map((hour) => {
+                        const isOccupied = allocations.some(alloc => alloc.hourBlock === hour);
+                        return (
+                          <SelectItem key={hour} value={hour.toString()} disabled={isOccupied}>
+                            {hour}:00 - {hour + 1}:00 {isOccupied ? '(Occupied)' : ''}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
               <Button 
-                onClick={handleAddAllocation}
-                disabled={!selectedProject || !selectedTeamMember || addAllocationMutation.isPending}
+                onClick={handleAddAllocation} 
+                disabled={!selectedProject || !selectedPhase || !selectedTeamMember || !selectedHourBlock || addAllocationMutation.isPending}
+                className="w-full"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Add
+                Add Hour Allocation
               </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        {/* Current Allocations */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Current Hour Allocations ({allocations.length} hours)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {allocations.length === 0 ? (
-              <p className="text-muted-foreground text-center py-4">No hours allocated for this day.</p>
-            ) : (
-              <div className="space-y-2">
-                {allocations
-                  .sort((a, b) => a.hourBlock - b.hourBlock)
-                  .map(allocation => (
-                    <div key={allocation.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Badge className="min-w-[60px]">{allocation.hourBlock}:00</Badge>
-                        <div className={`h-3 w-3 rounded-full ${getPhaseColor(allocation.phase)}`}></div>
-                        <span className="font-medium">{allocation.phase.toUpperCase()}</span>
-                        <span className="text-muted-foreground">-</span>
-                        <span>{allocation.teamMember?.name}</span>
-                        <span className="text-muted-foreground">on</span>
-                        <span className="font-medium">{allocation.project?.jobName}</span>
+          {/* Current Allocations */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Current Hour Allocations</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div>Loading allocations...</div>
+              ) : allocations.length === 0 ? (
+                <p className="text-muted-foreground">No hour allocations for this day.</p>
+              ) : (
+                <div className="space-y-2">
+                  {allocations
+                    .sort((a, b) => a.hourBlock - b.hourBlock)
+                    .map((allocation) => (
+                      <div key={allocation.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center gap-4">
+                          <div className="font-medium">
+                            {allocation.hourBlock}:00 - {allocation.hourBlock + 1}:00
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {allocation.teamMember?.name} - {allocation.project?.jobName} ({allocation.phase})
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteAllocation(allocation.id)}
+                          disabled={deleteAllocationMutation.isPending}
+                          className="text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => handleRemoveAllocation(allocation.id)}
-                        disabled={removeAllocationMutation.isPending}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                    ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </DialogContent>
     </Dialog>
   );
