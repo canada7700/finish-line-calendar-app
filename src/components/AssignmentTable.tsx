@@ -1,13 +1,15 @@
+
 import * as React from 'react';
 import { Project, ProjectAssignment, TeamMember } from '../types/project';
 import { useProjectAssignments } from '@/hooks/useProjectAssignments';
 import { useAddProjectAssignment, useUpdateProjectAssignment, useDeleteProjectAssignment } from '@/hooks/useProjectAssignmentMutations';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Trash2, Plus } from 'lucide-react';
+import { Trash2, Plus, Users, X } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 
 type Phase = 'millwork' | 'boxConstruction' | 'stain' | 'install';
 
@@ -28,7 +30,7 @@ export const AssignmentTable: React.FC<AssignmentTableProps> = ({
   const updateAssignmentMutation = useUpdateProjectAssignment();
   const deleteAssignmentMutation = useDeleteProjectAssignment();
 
-  const [newAssignments, setNewAssignments] = React.useState<{ [key: string]: { memberId: string; hours: number } }>({});
+  const [newAssignments, setNewAssignments] = React.useState<{ [key: string]: { memberIds: string[]; hours: number } }>({});
 
   const phases: { key: Phase; title: string; hours: number; colorClass: string }[] = [
     { key: 'millwork', title: 'Millwork', hours: project.millworkHrs, colorClass: 'bg-blue-50 border-blue-200' },
@@ -50,18 +52,39 @@ export const AssignmentTable: React.FC<AssignmentTableProps> = ({
     return teamMembers.filter(tm => !assignedMemberIds.has(tm.id));
   };
 
-  const handleAddMember = (phase: Phase) => {
-    const newAssignment = newAssignments[phase];
-    if (!newAssignment?.memberId) return;
+  const getEligibleMembers = (phase: Phase) => {
+    const availableMembers = getAvailableMembers(phase);
+    return availableMembers.filter(member => {
+      switch (phase) {
+        case 'millwork':
+          return member.canDoMillwork;
+        case 'boxConstruction':
+          return member.canDoBoxes;
+        case 'stain':
+          return member.canDoStain;
+        case 'install':
+          return member.canDoInstall;
+        default:
+          return true;
+      }
+    });
+  };
 
-    addAssignmentMutation.mutate({
-      projectId: project.id,
-      teamMemberId: newAssignment.memberId,
-      phase: phase,
-      assignedHours: newAssignment.hours || 0,
+  const handleAddMembers = (phase: Phase) => {
+    const newAssignment = newAssignments[phase];
+    if (!newAssignment?.memberIds?.length) return;
+
+    // Add assignments for all selected members
+    newAssignment.memberIds.forEach(memberId => {
+      addAssignmentMutation.mutate({
+        projectId: project.id,
+        teamMemberId: memberId,
+        phase: phase,
+        assignedHours: newAssignment.hours || 0,
+      });
     });
 
-    setNewAssignments(prev => ({ ...prev, [phase]: { memberId: '', hours: 0 } }));
+    setNewAssignments(prev => ({ ...prev, [phase]: { memberIds: [], hours: 0 } }));
   };
 
   const handleHourChange = (assignmentId: string, hours: number) => {
@@ -72,17 +95,36 @@ export const AssignmentTable: React.FC<AssignmentTableProps> = ({
     deleteAssignmentMutation.mutate(assignmentId);
   };
 
-  const updateNewAssignment = (phase: Phase, field: 'memberId' | 'hours', value: string | number) => {
+  const updateNewAssignment = (phase: Phase, field: 'memberIds' | 'hours', value: string[] | number) => {
     setNewAssignments(prev => ({
       ...prev,
       [phase]: { ...prev[phase], [field]: value }
     }));
   };
 
-  const getProgressColor = (assigned: number, total: number) => {
-    if (assigned === 0) return 'bg-gray-200';
-    if (assigned >= total) return 'bg-green-500';
-    return 'bg-blue-500';
+  const toggleMemberSelection = (phase: Phase, memberId: string) => {
+    const currentSelection = newAssignments[phase]?.memberIds || [];
+    const isSelected = currentSelection.includes(memberId);
+    
+    if (isSelected) {
+      updateNewAssignment(phase, 'memberIds', currentSelection.filter(id => id !== memberId));
+    } else {
+      updateNewAssignment(phase, 'memberIds', [...currentSelection, memberId]);
+    }
+  };
+
+  const selectAllEligibleMembers = (phase: Phase) => {
+    const eligibleMembers = getEligibleMembers(phase);
+    updateNewAssignment(phase, 'memberIds', eligibleMembers.map(m => m.id));
+  };
+
+  const clearMemberSelection = (phase: Phase) => {
+    updateNewAssignment(phase, 'memberIds', []);
+  };
+
+  const removeMemberFromSelection = (phase: Phase, memberId: string) => {
+    const currentSelection = newAssignments[phase]?.memberIds || [];
+    updateNewAssignment(phase, 'memberIds', currentSelection.filter(id => id !== memberId));
   };
 
   if (isLoading) {
@@ -95,7 +137,9 @@ export const AssignmentTable: React.FC<AssignmentTableProps> = ({
         const phaseAssignments = getPhaseAssignments(phase.key);
         const assignedHours = getAssignedHours(phase.key);
         const availableMembers = getAvailableMembers(phase.key);
+        const eligibleMembers = getEligibleMembers(phase.key);
         const progressPercentage = phase.hours > 0 ? (assignedHours / phase.hours) * 100 : 0;
+        const selectedMemberIds = newAssignments[phase.key]?.memberIds || [];
 
         return (
           <div key={phase.key} className={`border rounded-lg p-4 space-y-4 ${phase.colorClass}`}>
@@ -156,38 +200,108 @@ export const AssignmentTable: React.FC<AssignmentTableProps> = ({
             )}
             
             {availableMembers.length > 0 && (
-              <div className="flex items-center gap-2 pt-2 border-t">
-                <Select 
-                  value={newAssignments[phase.key]?.memberId || ''} 
-                  onValueChange={value => updateNewAssignment(phase.key, 'memberId', value)}
-                >
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Select team member" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableMembers.map(member => (
-                      <SelectItem key={member.id} value={member.id}>
-                        {member.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  type="number"
-                  min="0"
-                  placeholder="Hours"
-                  value={newAssignments[phase.key]?.hours || ''}
-                  onChange={e => updateNewAssignment(phase.key, 'hours', parseInt(e.target.value) || 0)}
-                  className="w-24"
-                />
-                <Button 
-                  onClick={() => handleAddMember(phase.key)} 
-                  disabled={!newAssignments[phase.key]?.memberId || addAssignmentMutation.isPending}
-                  size="sm"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add
-                </Button>
+              <div className="pt-2 border-t space-y-3">
+                {/* Selected Members Display */}
+                {selectedMemberIds.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      <span className="text-sm font-medium">
+                        {selectedMemberIds.length} member{selectedMemberIds.length !== 1 ? 's' : ''} selected
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {selectedMemberIds.map(memberId => {
+                        const member = teamMembers.find(tm => tm.id === memberId);
+                        return (
+                          <Badge key={memberId} variant="secondary" className="flex items-center gap-1">
+                            {member?.name}
+                            <X 
+                              className="h-3 w-3 cursor-pointer hover:text-destructive" 
+                              onClick={() => removeMemberFromSelection(phase.key, memberId)}
+                            />
+                          </Badge>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Team Member Selection */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Select Team Members</span>
+                    <div className="flex gap-2">
+                      {eligibleMembers.length > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => selectAllEligibleMembers(phase.key)}
+                          disabled={selectedMemberIds.length === eligibleMembers.length}
+                        >
+                          Select All Eligible ({eligibleMembers.length})
+                        </Button>
+                      )}
+                      {selectedMemberIds.length > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => clearMemberSelection(phase.key)}
+                        >
+                          Clear Selection
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-32 overflow-y-auto">
+                    {availableMembers.map(member => {
+                      const isEligible = eligibleMembers.some(em => em.id === member.id);
+                      const isSelected = selectedMemberIds.includes(member.id);
+                      
+                      return (
+                        <div
+                          key={member.id}
+                          className={`flex items-center space-x-2 p-2 rounded border cursor-pointer hover:bg-gray-50 ${
+                            isSelected ? 'bg-blue-50 border-blue-200' : ''
+                          } ${!isEligible ? 'opacity-50' : ''}`}
+                          onClick={() => toggleMemberSelection(phase.key, member.id)}
+                        >
+                          <Checkbox
+                            checked={isSelected}
+                            onChange={() => {}}
+                          />
+                          <span className="text-sm flex-1">
+                            {member.name}
+                            {!isEligible && (
+                              <span className="text-xs text-muted-foreground ml-1">(not eligible)</span>
+                            )}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Hours Input and Add Button */}
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min="0"
+                    placeholder="Hours"
+                    value={newAssignments[phase.key]?.hours || ''}
+                    onChange={e => updateNewAssignment(phase.key, 'hours', parseInt(e.target.value) || 0)}
+                    className="w-24"
+                  />
+                  <Button 
+                    onClick={() => handleAddMembers(phase.key)} 
+                    disabled={!selectedMemberIds.length || addAssignmentMutation.isPending}
+                    size="sm"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add {selectedMemberIds.length > 1 ? `${selectedMemberIds.length} Members` : 'Member'}
+                  </Button>
+                </div>
               </div>
             )}
             
