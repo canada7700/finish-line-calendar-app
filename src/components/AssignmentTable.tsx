@@ -67,13 +67,20 @@ export const AssignmentTable: React.FC<AssignmentTableProps> = ({
     return assignments.filter(a => a.phase === phase);
   };
 
+  // Use only saved assignment hours for progress bar calculation
   const getAssignedHours = (phase: Phase) => {
     const phaseAssignments = getPhaseAssignments(phase);
-    return phaseAssignments.reduce((acc, a) => {
-      // Use editing value if available, otherwise use stored value
-      const hours = editingHours[a.id] ? (parseInt(editingHours[a.id]) || 0) : a.assignedHours;
-      return acc + hours;
-    }, 0);
+    return phaseAssignments.reduce((acc, a) => acc + a.assignedHours, 0);
+  };
+
+  // Use editing values for individual input displays
+  const getDisplayedHours = (assignmentId: string) => {
+    const assignment = assignments.find(a => a.id === assignmentId);
+    if (!assignment) return '0';
+    
+    return editingHours[assignmentId] !== undefined 
+      ? editingHours[assignmentId] 
+      : assignment.assignedHours.toString();
   };
 
   const getAvailableMembers = (phase: Phase) => {
@@ -213,7 +220,7 @@ export const AssignmentTable: React.FC<AssignmentTableProps> = ({
             
             <Progress 
               value={Math.min(progressPercentage, 100)} 
-              className="h-2"
+              className="h-2 transition-all duration-300"
             />
 
             {phaseAssignments.length > 0 && (
@@ -230,7 +237,7 @@ export const AssignmentTable: React.FC<AssignmentTableProps> = ({
                     const member = teamMembers.find(tm => tm.id === assignment.teamMemberId);
                     const isEditing = editingHours[assignment.id] !== undefined;
                     const isPending = pendingUpdates.has(assignment.id);
-                    const displayValue = isEditing ? editingHours[assignment.id] : assignment.assignedHours.toString();
+                    const displayValue = getDisplayedHours(assignment.id);
                     
                     return (
                       <TableRow key={assignment.id}>
