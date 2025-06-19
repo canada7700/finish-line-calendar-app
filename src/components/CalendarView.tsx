@@ -90,26 +90,42 @@ export const CalendarView = ({ phases }: CalendarViewProps) => {
     return () => currentObserver.disconnect();
   }, [loadPrevious, loadNext, isDragging, isRescheduling]);
 
-  // Only scroll to current month on initial load - never after rescheduling
+  // Only scroll to current month on initial load - NEVER after any user interaction
   useEffect(() => {
+    console.log('Scroll to current month effect - conditions:', {
+      isLoadingHolidays,
+      hasCurrentMonthRef: !!currentMonthRef.current,
+      hasCompletedInitialScroll,
+      hasUserNavigated,
+      isDragging,
+      isRescheduling
+    });
+    
     if (!isLoadingHolidays && 
         currentMonthRef.current && 
         !hasCompletedInitialScroll && 
-        !hasUserNavigated) {
+        !hasUserNavigated && 
+        !isDragging && 
+        !isRescheduling) {
+      console.log('Scrolling to current month');
       currentMonthRef.current.scrollIntoView({ block: 'start' });
       setHasCompletedInitialScroll(true);
     }
-  }, [isLoadingHolidays, hasUserNavigated, hasCompletedInitialScroll]);
+  }, [isLoadingHolidays, hasUserNavigated, hasCompletedInitialScroll, isDragging, isRescheduling]);
 
   const handleDragStart = (event: DragStartEvent) => {
+    console.log('Drag start - marking user as navigated');
     const { active } = event;
     if (active.data.current?.type === 'project-phase') {
       setActivePhase(active.data.current.phase);
       setIsDragging(true);
+      // Mark user as having navigated as soon as they start dragging
+      setHasUserNavigated(true);
     }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
+    console.log('Drag end');
     const { active, over } = event;
     setActivePhase(null);
     setIsDragging(false);
