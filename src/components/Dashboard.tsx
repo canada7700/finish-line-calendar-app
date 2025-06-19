@@ -169,7 +169,7 @@ const Dashboard = () => {
         </Card>
       </div>
 
-      <TeamWorkloadOverview phases={phases} />
+      <TeamWorkloadOverview />
     </div>
   );
 };
