@@ -1,6 +1,7 @@
-import { useState, useRef, useMemo } from 'react';
+
+import { useState, useRef, useMemo, useEffect, useLayoutEffect } from 'react';
 import { ProjectPhase } from '../types/project';
-import { addMonths, subMonths } from 'date-fns';
+import { addMonths, format } from 'date-fns';
 import { useHolidays } from '@/hooks/useHolidays';
 import { useProjectRescheduling } from '@/hooks/useProjectRescheduling';
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -28,14 +29,13 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
 
   const [activePhase, setActivePhase] = useState<ProjectPhase | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [savedScrollPosition, setSavedScrollPosition] = useState<number | null>(null);
   const [selectedPhases, setSelectedPhases] = useState<string[]>(['all']);
-  const [scrollLocked, setScrollLocked] = useState(false);
   
   const { holidays, isLoading: isLoadingHolidays } = useHolidays();
   const { rescheduleProject, isRescheduling, applyPendingUpdates } = useProjectRescheduling(isDragging);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollPositionRef = useRef<number | null>(null);
 
   // Filter phases based on selected filters
   const filteredPhases = useMemo(() => {
@@ -49,72 +49,43 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
     setSelectedPhases(newSelectedPhases);
   };
 
-  const lockScrollPosition = () => {
-    if (scrollContainerRef.current) {
-      const currentPosition = scrollContainerRef.current.scrollTop;
-      setSavedScrollPosition(currentPosition);
-      setScrollLocked(true);
-      console.log('Scroll locked at position:', currentPosition);
-      
-      // Prevent any scroll events during the lock
-      const scrollHandler = (e: Event) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (scrollContainerRef.current) {
-          scrollContainerRef.current.scrollTop = currentPosition;
-        }
-      };
-      
-      scrollContainerRef.current.addEventListener('scroll', scrollHandler, { passive: false });
-      
-      // Store the handler to remove it later
-      (scrollContainerRef.current as any)._lockHandler = scrollHandler;
-    }
-  };
+  // Auto-scroll to current month on initial load
+  useEffect(() => {
+    const currentMonthId = `month-${format(new Date(), 'yyyy-MM')}`;
+    const scrollContainer = scrollContainerRef.current;
 
-  const unlockScrollPosition = () => {
-    if (scrollContainerRef.current && scrollLocked) {
-      const scrollHandler = (scrollContainerRef.current as any)._lockHandler;
-      if (scrollHandler) {
-        scrollContainerRef.current.removeEventListener('scroll', scrollHandler);
-        delete (scrollContainerRef.current as any)._lockHandler;
-      }
-      
-      if (savedScrollPosition !== null) {
-        // Use multiple requestAnimationFrame calls for better timing
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              if (scrollContainerRef.current && savedScrollPosition !== null) {
-                console.log('Restoring scroll position to:', savedScrollPosition);
-                scrollContainerRef.current.scrollTop = savedScrollPosition;
-                setSavedScrollPosition(null);
-                setScrollLocked(false);
-                
-                // Apply any pending cache updates after scroll is restored
-                setTimeout(() => {
-                  applyPendingUpdates();
-                }, 100);
-              }
-            });
-          });
-        });
-      } else {
-        setScrollLocked(false);
-        // Apply any pending cache updates
-        setTimeout(() => {
-          applyPendingUpdates();
-        }, 100);
-      }
+    if (scrollContainer) {
+      // Use a small timeout to ensure all month elements have rendered
+      setTimeout(() => {
+        const currentMonthElement = document.getElementById(currentMonthId);
+        if (currentMonthElement) {
+          const containerTop = scrollContainer.getBoundingClientRect().top;
+          const elementTop = currentMonthElement.getBoundingClientRect().top;
+          const scrollOffset = elementTop - containerTop;
+
+          scrollContainer.scrollTop = scrollOffset;
+        }
+      }, 150); // A small delay can help ensure rendering is complete
     }
-  };
+  }, []); // The empty dependency array ensures this runs only once
+
+  // Preserve scroll position after drag-and-drop operations
+  useLayoutEffect(() => {
+    if (scrollPositionRef.current !== null && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollPositionRef.current;
+      // Reset the ref after restoring the position
+      scrollPositionRef.current = null;
+    }
+  }, [phases]); // This effect depends on the `phases` array, so it runs after a re-render
 
   const handleDragStart = (event: DragStartEvent) => {
-    console.log('Drag start - locking scroll position and preventing cache updates');
+    console.log('Drag start - saving scroll position');
     const { active } = event;
     
-    // Lock the scroll position immediately
-    lockScrollPosition();
+    // Save the current scroll position before the drag starts
+    if (scrollContainerRef.current) {
+      scrollPositionRef.current = scrollContainerRef.current.scrollTop;
+    }
     
     if (active.data.current?.type === 'project-phase') {
       setActivePhase(active.data.current.phase);
@@ -172,12 +143,13 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
       }
     };
 
-    // First restore scroll position, then perform the reschedule
-    unlockScrollPosition();
-    
     // Delay the reschedule operation to allow scroll restoration to complete
     setTimeout(() => {
       performReschedule();
+      // Apply any pending cache updates after the operation
+      setTimeout(() => {
+        applyPendingUpdates();
+      }, 100);
     }, 100);
   };
 

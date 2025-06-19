@@ -1,4 +1,3 @@
-
 import { useMemo, useState, useEffect } from 'react';
 import { ProjectPhase, ProjectNote, DailyNote } from '../types/project';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, startOfWeek, endOfWeek } from 'date-fns';
@@ -187,7 +186,7 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
   };
 
   return (
-    <>
+    <div id={`month-${format(monthDate, 'yyyy-MM')}`}>
       <Card className="mb-8">
         <CardHeader>
           <CardTitle>{format(monthDate, 'MMMM yyyy')}</CardTitle>
@@ -303,7 +302,7 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
         dailyNote={dialogState.date ? dailyNotesByDate.get(format(dialogState.date, 'yyyy-MM-dd')) : undefined}
         onNoteUpdate={handleNoteUpdate}
       />
-    </>
+    </div>
   );
 };
 
