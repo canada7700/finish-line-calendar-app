@@ -7,7 +7,7 @@ interface DroppableCalendarDayProps {
   date: Date;
   holidays: Map<string, string>;
   children: React.ReactNode;
-  onProjectDrop?: (date: Date) => void;
+  onProjectDrop?: (phaseId: string, newDate: Date) => void;
 }
 
 const DroppableCalendarDay = ({ 

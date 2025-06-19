@@ -18,10 +18,9 @@ interface MonthViewProps {
   monthDate: Date;
   phases: ProjectPhase[];
   holidays: Holiday[];
-  onProjectDrop?: (phaseId: string, newDate: Date) => void;
 }
 
-const MonthView = ({ monthDate, phases, holidays, onProjectDrop }: MonthViewProps) => {
+const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
   const [dialogState, setDialogState] = useState<{ open: boolean; date: Date | null }>({ open: false, date: null });
   const { rescheduleProject } = useProjectRescheduling();
   
@@ -109,7 +108,7 @@ const MonthView = ({ monthDate, phases, holidays, onProjectDrop }: MonthViewProp
     rescheduleProject(project, newDate);
     
     // Call the optional callback
-    onProjectDrop?.(phaseId, newDate);
+    // onProjectDrop?.(phaseId, newDate);
   };
 
   const isNonWorkingDay = (date: Date) => {
@@ -199,7 +198,6 @@ const MonthView = ({ monthDate, phases, holidays, onProjectDrop }: MonthViewProp
                   key={day.toISOString()}
                   date={day}
                   holidays={holidaysMap}
-                  onProjectDrop={handleProjectDrop}
                 >
                   <div
                     className={getDayClasses(day, dayPhases, hasCapacityIssues)}
