@@ -76,76 +76,57 @@ const HourAllocationGrid = ({ allocations, date, onDeleteAllocation, isDeleting 
         <CardTitle>Hour Allocation Grid - {format(date, 'MMMM d, yyyy')}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr>
-                <th className="text-left p-2 border-b font-medium sticky left-0 bg-background min-w-[120px] text-sm">
-                  Team Member
-                </th>
-                {hourBlocks.map(hour => (
-                  <th key={hour} className="text-center p-2 border-b font-medium min-w-[80px] text-sm">
-                    {hour}:00
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
+        <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${hourBlocks.length}, 1fr)` }}>
+          {/* Hour headers */}
+          {hourBlocks.map(hour => (
+            <div key={`header-${hour}`} className="text-center font-semibold p-2 bg-muted rounded-md">
+              {hour}:00
+            </div>
+          ))}
+          
+          {/* Allocations for each hour */}
+          {hourBlocks.map(hour => (
+            <div key={`column-${hour}`} className="space-y-2">
               {membersWithAllocations.map(member => {
                 const memberAllocations = allocationMap.get(member.id);
-                return (
-                  <tr key={member.id} className="border-b hover:bg-muted/30">
-                    <td className="p-2 font-medium sticky left-0 bg-background border-r text-sm">
-                      {member.name}
-                    </td>
-                    {hourBlocks.map(hour => {
-                      const hourAllocations = memberAllocations?.get(hour) || [];
-                      return (
-                        <td key={hour} className="p-1 text-center align-top">
-                          {hourAllocations.length > 0 && (
-                            <div className="space-y-1">
-                              {hourAllocations.map(allocation => (
-                                <div key={allocation.id} className="relative group">
-                                  <div
-                                    className={`
-                                      border rounded-md px-2 py-1.5 cursor-pointer transition-all duration-200
-                                      ${getPhaseColor(allocation.phase)}
-                                      hover:shadow-sm
-                                      text-xs font-medium
-                                      min-h-[2.5rem]
-                                      flex flex-col justify-center
-                                      relative
-                                    `}
-                                    title={`${allocation.project?.jobName} - ${allocation.phase.toUpperCase()}`}
-                                  >
-                                    <div className="truncate text-xs font-semibold leading-tight">
-                                      {allocation.project?.jobName}
-                                    </div>
-                                    <div className="text-[10px] opacity-80 font-medium uppercase tracking-wide mt-0.5">
-                                      {allocation.phase}
-                                    </div>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="absolute -top-1 -right-1 h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity p-0 bg-white/90 hover:bg-white shadow-sm border"
-                                      onClick={() => onDeleteAllocation(allocation.id)}
-                                      disabled={isDeleting}
-                                    >
-                                      <Trash2 className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
+                const hourAllocations = memberAllocations?.get(hour) || [];
+                
+                return hourAllocations.map(allocation => (
+                  <div key={allocation.id} className="relative group">
+                    <div
+                      className={`
+                        border-2 rounded-lg p-3 cursor-pointer transition-all duration-200
+                        ${getPhaseColor(allocation.phase)}
+                        hover:shadow-md hover:scale-105
+                        relative
+                      `}
+                      title={`${member.name} - ${allocation.project?.jobName} - ${allocation.phase.toUpperCase()}`}
+                    >
+                      <div className="text-xs font-medium text-gray-600 mb-1">
+                        {member.name}
+                      </div>
+                      <div className="font-semibold text-sm leading-tight mb-1">
+                        {allocation.project?.jobName}
+                      </div>
+                      <div className="text-xs opacity-80 font-medium uppercase tracking-wide">
+                        {allocation.phase}
+                      </div>
+                      
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute -top-2 -right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity p-0 bg-white/90 hover:bg-white shadow-sm border rounded-full"
+                        onClick={() => onDeleteAllocation(allocation.id)}
+                        disabled={isDeleting}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ));
               })}
-            </tbody>
-          </table>
+            </div>
+          ))}
         </div>
       </CardContent>
     </Card>
