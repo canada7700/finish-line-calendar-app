@@ -17,12 +17,13 @@ interface DayDialogProps {
   phases: ProjectPhase[];
   projectNotes: ProjectNote[];
   dailyNote?: DailyNote;
+  selectedPhase?: ProjectPhase | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onNoteUpdate: () => void;
 }
 
-const DayDialog = ({ date, phases, projectNotes, dailyNote, open, onOpenChange, onNoteUpdate }: DayDialogProps) => {
+const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open, onOpenChange, onNoteUpdate }: DayDialogProps) => {
   const [currentProjectNotes, setCurrentProjectNotes] = React.useState<Record<string, string>>({});
   const [currentDailyNote, setCurrentDailyNote] = React.useState('');
   const [showHourAllocation, setShowHourAllocation] = React.useState(false);
@@ -181,6 +182,7 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, open, onOpenChange, 
       <HourAllocationDialog
         date={date}
         phases={phases}
+        selectedPhase={selectedPhase}
         open={showHourAllocation}
         onOpenChange={setShowHourAllocation}
       />

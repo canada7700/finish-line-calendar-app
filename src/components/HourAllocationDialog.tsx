@@ -20,11 +20,12 @@ import HourAllocationGrid from './HourAllocationGrid';
 interface HourAllocationDialogProps {
   date: Date;
   phases: ProjectPhase[];
+  selectedPhase?: ProjectPhase | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocationDialogProps) => {
+const HourAllocationDialog = ({ date, phases, selectedPhase, open, onOpenChange }: HourAllocationDialogProps) => {
   const [selectedProject, setSelectedProject] = React.useState<string>('');
   const [selectedPhase, setSelectedPhase] = React.useState<string>('');
   const [selectedTeamMembers, setSelectedTeamMembers] = React.useState<string[]>([]);
@@ -43,6 +44,20 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
   const removeAllocationMutation = useRemoveHourAllocation();
 
   const { capacityInfo, hasOverAllocation } = useDayCapacityInfo(date, allocations, capacities);
+
+  // Set initial values when dialog opens with selected phase context
+  React.useEffect(() => {
+    if (open && selectedPhase) {
+      setSelectedProject(selectedPhase.projectId);
+      setSelectedPhase(selectedPhase.phase);
+    } else if (!open) {
+      // Reset form when dialog closes
+      setSelectedProject('');
+      setSelectedPhase('');
+      setSelectedTeamMembers([]);
+      setSelectedHourBlocks([]);
+    }
+  }, [open, selectedPhase]);
 
   React.useEffect(() => {
     if (open) {
@@ -381,6 +396,11 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
           </DialogTitle>
           <DialogDescription>
             Assign team members to specific hour blocks for different project phases. Work day is 8 AM to 5 PM. Team members cannot be double-booked.
+            {selectedPhase && (
+              <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
+                <strong>Selected:</strong> {selectedPhase.projectName} - {selectedPhase.phase.toUpperCase()}
+              </div>
+            )}
           </DialogDescription>
         </DialogHeader>
 

@@ -10,6 +10,7 @@ interface DraggableProjectPhaseProps {
   hasSchedulingConflict?: boolean;
   conflictReason?: string;
   isLastInstallDay?: boolean;
+  onPhaseClick?: (event: React.MouseEvent) => void;
   children: React.ReactNode;
 }
 
@@ -18,6 +19,7 @@ const DraggableProjectPhase = ({
   hasSchedulingConflict, 
   conflictReason,
   isLastInstallDay = false,
+  onPhaseClick,
   children 
 }: DraggableProjectPhaseProps) => {
   const { isRescheduling } = useProjectRescheduling();
@@ -45,8 +47,19 @@ const DraggableProjectPhase = ({
   // Only make install phases draggable AND only if it's the last install day
   const isDraggablePhase = phase.phase === 'install' && isLastInstallDay;
 
+  const handleClick = (event: React.MouseEvent) => {
+    // Call the phase click handler if provided
+    if (onPhaseClick) {
+      onPhaseClick(event);
+    }
+  };
+
   if (!isDraggablePhase) {
-    return <>{children}</>;
+    return (
+      <div onClick={handleClick} className="cursor-pointer">
+        {children}
+      </div>
+    );
   }
 
   return (
@@ -55,6 +68,7 @@ const DraggableProjectPhase = ({
       style={style}
       {...listeners}
       {...attributes}
+      onClick={handleClick}
       className={`
         ${isDragging ? 'opacity-50 z-50' : ''} 
         ${isDraggablePhase && !isRescheduling ? 'cursor-grab active:cursor-grabbing' : ''}

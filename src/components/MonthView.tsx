@@ -21,7 +21,11 @@ interface MonthViewProps {
 }
 
 const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
-  const [dialogState, setDialogState] = useState<{ open: boolean; date: Date | null }>({ open: false, date: null });
+  const [dialogState, setDialogState] = useState<{ 
+    open: boolean; 
+    date: Date | null; 
+    selectedPhase: ProjectPhase | null;
+  }>({ open: false, date: null, selectedPhase: null });
   const { rescheduleProject } = useProjectRescheduling();
   
   const monthStart = startOfMonth(monthDate);
@@ -176,13 +180,26 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
   };
 
   const handleDayClick = (day: Date) => {
-    setDialogState({ open: true, date: day });
+    setDialogState({ open: true, date: day, selectedPhase: null });
+  };
+
+  const handlePhaseClick = (day: Date, phase: ProjectPhase, event: React.MouseEvent) => {
+    event.stopPropagation();
+    setDialogState({ open: true, date: day, selectedPhase: phase });
   };
   
   const handleNoteUpdate = () => {
     refetchProjectNotes();
     refetchDailyNotes();
     refetchPhaseExceptions();
+  };
+
+  const handleDialogClose = (open: boolean) => {
+    setDialogState({ ...dialogState, open });
+    // Reset selectedPhase when dialog closes
+    if (!open) {
+      setDialogState(prev => ({ ...prev, selectedPhase: null }));
+    }
   };
 
   return (
@@ -267,6 +284,7 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
                             hasSchedulingConflict={hasSchedulingConflict}
                             conflictReason={nonWorkingInfo.reason}
                             isLastInstallDay={isLastInstallDay}
+                            onPhaseClick={(event) => handlePhaseClick(day, phase, event)}
                           >
                             <div
                               className={`text-xs p-1 rounded text-white ${phase.color} truncate ${hasSchedulingConflict ? 'border border-red-300' : ''} relative`}
@@ -295,11 +313,12 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
       </Card>
       <DayDialog
         open={dialogState.open}
-        onOpenChange={(open) => setDialogState({ ...dialogState, open })}
+        onOpenChange={handleDialogClose}
         date={dialogState.date}
         phases={dialogState.date ? getPhasesForDate(dialogState.date) : []}
         projectNotes={dialogState.date ? projectNotesByDate.get(format(dialogState.date, 'yyyy-MM-dd')) || [] : []}
         dailyNote={dialogState.date ? dailyNotesByDate.get(format(dialogState.date, 'yyyy-MM-dd')) : undefined}
+        selectedPhase={dialogState.selectedPhase}
         onNoteUpdate={handleNoteUpdate}
       />
     </div>
