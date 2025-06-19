@@ -9,6 +9,7 @@ interface DraggableProjectPhaseProps {
   phase: ProjectPhase;
   hasSchedulingConflict?: boolean;
   conflictReason?: string;
+  isLastInstallDay?: boolean;
   children: React.ReactNode;
 }
 
@@ -16,6 +17,7 @@ const DraggableProjectPhase = ({
   phase, 
   hasSchedulingConflict, 
   conflictReason,
+  isLastInstallDay = false,
   children 
 }: DraggableProjectPhaseProps) => {
   const { isRescheduling } = useProjectRescheduling();
@@ -39,8 +41,8 @@ const DraggableProjectPhase = ({
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
   } : undefined;
 
-  // Only make install phases draggable (these will be the "handle" for moving entire projects)
-  const isDraggablePhase = phase.phase === 'install';
+  // Only make install phases draggable AND only if it's the last install day
+  const isDraggablePhase = phase.phase === 'install' && isLastInstallDay;
 
   if (!isDraggablePhase) {
     return <>{children}</>;

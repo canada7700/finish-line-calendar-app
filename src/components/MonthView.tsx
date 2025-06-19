@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+
+import { useMemo, useState, useEffect } from 'react';
 import { ProjectPhase, ProjectNote, DailyNote } from '../types/project';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, startOfWeek, endOfWeek } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -67,11 +68,6 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
     return map;
   }, [phaseExceptions]);
 
-  const dailyAllocationsMap = useMemo(() => {
-    const map = new Map<string, any[]>();
-    return map;
-  }, []);
-
   const phasesByProject = useMemo(() => {
     const map = new Map<string, ProjectPhase[]>();
     phases.forEach(phase => {
@@ -80,6 +76,34 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
       }
       map.get(phase.projectId)!.push(phase);
     });
+    return map;
+  }, [phases]);
+
+  // Create a map to identify the last install day for each project
+  const lastInstallDayByProject = useMemo(() => {
+    const map = new Map<string, string>();
+    
+    // Group install phases by project
+    const installPhasesByProject = new Map<string, ProjectPhase[]>();
+    phases.forEach(phase => {
+      if (phase.phase === 'install') {
+        if (!installPhasesByProject.has(phase.projectId)) {
+          installPhasesByProject.set(phase.projectId, []);
+        }
+        installPhasesByProject.get(phase.projectId)!.push(phase);
+      }
+    });
+
+    // Find the last install date for each project
+    installPhasesByProject.forEach((installPhases, projectId) => {
+      const sortedPhases = installPhases.sort((a, b) => 
+        new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
+      );
+      if (sortedPhases.length > 0) {
+        map.set(projectId, sortedPhases[0].startDate);
+      }
+    });
+
     return map;
   }, [phases]);
 
@@ -106,9 +130,6 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
 
     // Reschedule the project
     rescheduleProject(project, newDate);
-    
-    // Call the optional callback
-    // onProjectDrop?.(phaseId, newDate);
   };
 
   const isNonWorkingDay = (date: Date) => {
@@ -235,29 +256,36 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
                     </div>
                     
                     <div className="space-y-1 mt-auto pt-1">
-                      {dayPhases.map(phase => (
-                        <DraggableProjectPhase
-                          key={phase.id}
-                          phase={phase}
-                          hasSchedulingConflict={hasSchedulingConflict}
-                          conflictReason={nonWorkingInfo.reason}
-                        >
-                          <div
-                            className={`text-xs p-1 rounded text-white ${phase.color} truncate ${hasSchedulingConflict ? 'border border-red-300' : ''} relative`}
-                            title={`${phase.projectName} - ${phase.phase.toUpperCase()} (${phase.hours}h)${hasSchedulingConflict ? ' - CONFLICT: Scheduled on ' + nonWorkingInfo.reason : ''}`}
+                      {dayPhases.map(phase => {
+                        // Check if this is the last install day for this project
+                        const isLastInstallDay = phase.phase === 'install' && 
+                          lastInstallDayByProject.get(phase.projectId) === phase.startDate;
+                        
+                        return (
+                          <DraggableProjectPhase
+                            key={phase.id}
+                            phase={phase}
+                            hasSchedulingConflict={hasSchedulingConflict}
+                            conflictReason={nonWorkingInfo.reason}
+                            isLastInstallDay={isLastInstallDay}
                           >
-                            {phase.projectName}
-                            <div className="text-[10px] opacity-90">
-                              {phase.phase.toUpperCase()}
-                            </div>
-                            {hasSchedulingConflict && (
-                              <div className="text-[10px] text-red-200">
-                                ⚠️ CONFLICT
+                            <div
+                              className={`text-xs p-1 rounded text-white ${phase.color} truncate ${hasSchedulingConflict ? 'border border-red-300' : ''} relative`}
+                              title={`${phase.projectName} - ${phase.phase.toUpperCase()} (${phase.hours}h)${hasSchedulingConflict ? ' - CONFLICT: Scheduled on ' + nonWorkingInfo.reason : ''}`}
+                            >
+                              {phase.projectName}
+                              <div className="text-[10px] opacity-90">
+                                {phase.phase.toUpperCase()}
                               </div>
-                            )}
-                          </div>
-                        </DraggableProjectPhase>
-                      ))}
+                              {hasSchedulingConflict && (
+                                <div className="text-[10px] text-red-200">
+                                  ⚠️ CONFLICT
+                                </div>
+                              )}
+                            </div>
+                          </DraggableProjectPhase>
+                        );
+                      })}
                     </div>
                   </div>
                 </DroppableCalendarDay>
