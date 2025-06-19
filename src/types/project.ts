@@ -1,4 +1,3 @@
-
 export interface Project {
   id: string;
   jobName: string;
@@ -15,7 +14,7 @@ export interface Project {
   millworkStartDate?: string;
   boxConstructionStartDate?: string;
   stainStartDate?: string;
-  status: 'planning' | 'shop' | 'stain' | 'install' | 'completed';
+  status: 'planning' | 'shop' | 'stain' | 'install' | 'completed' | 'custom';
 }
 
 export interface ProjectPhase {
