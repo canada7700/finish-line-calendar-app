@@ -1,4 +1,3 @@
-
 import { useState, useRef, useMemo } from 'react';
 import { ProjectPhase } from '../types/project';
 import { addMonths, subMonths } from 'date-fns';
@@ -148,6 +147,7 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
 
       if (active.data.current?.type === 'project-phase') {
         const phase = active.data.current.phase as ProjectPhase;
+        const isLastInstallDay = active.data.current.isLastInstallDay;
         
         // Only handle install phases (which are our drag handles)
         if (phase.phase === 'install') {
@@ -166,7 +166,8 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
             status: 'planning' as const
           };
 
-          rescheduleProject(project, dropDate);
+          // Pass whether this is the last install day to the reschedule function
+          rescheduleProject(project, dropDate, isLastInstallDay);
         }
       }
     };

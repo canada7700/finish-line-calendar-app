@@ -14,21 +14,30 @@ export const useProjectRescheduling = (isDragInProgress: boolean = false) => {
   const rescheduleProjectMutation = useMutation({
     mutationFn: async ({ 
       project, 
-      newInstallDate 
+      newInstallDate,
+      isSettingInstallEnd = false
     }: { 
       project: Project; 
-      newInstallDate: Date; 
+      newInstallDate: Date;
+      isSettingInstallEnd?: boolean;
     }) => {
-      console.log('Rescheduling project:', project.jobName, 'to new install date:', format(newInstallDate, 'yyyy-MM-dd'));
+      console.log('Rescheduling project:', project.jobName, 'to new install date:', format(newInstallDate, 'yyyy-MM-dd'), 'isSettingInstallEnd:', isSettingInstallEnd);
       
-      // Create updated project with new install date
-      const updatedProject = {
-        ...project,
-        installDate: format(newInstallDate, 'yyyy-MM-dd')
-      };
+      let recalculatedProject: Project;
 
-      // Recalculate all project dates based on new install date
-      const recalculatedProject = await ProjectScheduler.calculateProjectDates(updatedProject);
+      if (isSettingInstallEnd) {
+        // Calculate from install end date (when dragging last install day)
+        recalculatedProject = await ProjectScheduler.calculateProjectDatesFromInstallEnd(project, newInstallDate);
+      } else {
+        // Create updated project with new install start date (standard behavior)
+        const updatedProject = {
+          ...project,
+          installDate: format(newInstallDate, 'yyyy-MM-dd')
+        };
+
+        // Recalculate all project dates based on new install start date
+        recalculatedProject = await ProjectScheduler.calculateProjectDates(updatedProject);
+      }
       
       console.log('Recalculated project dates:', recalculatedProject);
 
@@ -153,19 +162,20 @@ export const useProjectRescheduling = (isDragInProgress: boolean = false) => {
     }
   };
 
-  const rescheduleProject = (project: Project, newInstallDate: Date) => {
+  const rescheduleProject = (project: Project, newInstallDate: Date, isSettingInstallEnd: boolean = false) => {
     const currentInstallDate = new Date(`${project.installDate}T00:00:00`);
     const daysDifference = Math.abs(differenceInDays(newInstallDate, currentInstallDate));
     
     // Show confirmation for large date changes (more than 7 days)
     if (daysDifference > 7) {
+      const action = isSettingInstallEnd ? 'setting install end to' : 'moving install start to';
       const confirmed = window.confirm(
-        `You are moving "${project.jobName}" by ${daysDifference} days. This will recalculate all project dates. Continue?`
+        `You are ${action} "${project.jobName}" by ${daysDifference} days. This will recalculate all project dates. Continue?`
       );
       if (!confirmed) return;
     }
 
-    rescheduleProjectMutation.mutate({ project, newInstallDate });
+    rescheduleProjectMutation.mutate({ project, newInstallDate, isSettingInstallEnd });
   };
 
   return {

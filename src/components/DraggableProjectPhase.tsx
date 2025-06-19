@@ -32,7 +32,8 @@ const DraggableProjectPhase = ({
     id: phase.id,
     data: {
       phase,
-      type: 'project-phase'
+      type: 'project-phase',
+      isLastInstallDay
     },
     disabled: isRescheduling
   });
