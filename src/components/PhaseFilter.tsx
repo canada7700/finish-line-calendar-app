@@ -76,12 +76,18 @@ export const PhaseFilter = ({ phases, onFilterChange }: PhaseFilterProps) => {
   };
 
   const isSelected = (phase: string) => {
+    if (phase === 'none') {
+      return selectedPhases.length === 0;
+    }
     return selectedPhases.includes('all') || selectedPhases.includes(phase);
   };
 
   const getFilterButtonText = () => {
-    if (selectedPhases.includes('all') || selectedPhases.length === 0) {
+    if (selectedPhases.includes('all')) {
       return 'All Phases';
+    }
+    if (selectedPhases.length === 0) {
+      return 'No phases selected';
     }
     if (selectedPhases.length === 1) {
       const phase = selectedPhases[0];
@@ -107,7 +113,14 @@ export const PhaseFilter = ({ phases, onFilterChange }: PhaseFilterProps) => {
             <DropdownMenuLabel>Filter by Phase</DropdownMenuLabel>
             <DropdownMenuSeparator />
             
-            <DropdownMenuItem onClick={selectAll} className="cursor-pointer">
+            <DropdownMenuItem 
+              onSelect={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.stopPropagation();
+                selectAll();
+              }}
+              className="cursor-pointer"
+            >
               <Checkbox
                 checked={selectedPhases.includes('all')}
                 className="mr-2"
@@ -119,9 +132,16 @@ export const PhaseFilter = ({ phases, onFilterChange }: PhaseFilterProps) => {
               </Badge>
             </DropdownMenuItem>
             
-            <DropdownMenuItem onClick={clearAll} className="cursor-pointer">
+            <DropdownMenuItem 
+              onSelect={(e) => e.preventDefault()}
+              onClick={(e) => {
+                e.stopPropagation();
+                clearAll();
+              }}
+              className="cursor-pointer"
+            >
               <Checkbox
-                checked={selectedPhases.length === 0}
+                checked={isSelected('none')}
                 className="mr-2"
               />
               <span className="ml-5">None</span>
@@ -138,7 +158,11 @@ export const PhaseFilter = ({ phases, onFilterChange }: PhaseFilterProps) => {
               return (
                 <DropdownMenuItem
                   key={phaseKey}
-                  onClick={() => handlePhaseToggle(phaseKey)}
+                  onSelect={(e) => e.preventDefault()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePhaseToggle(phaseKey);
+                  }}
                   className="cursor-pointer"
                 >
                   <Checkbox
