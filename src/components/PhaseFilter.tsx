@@ -49,10 +49,7 @@ export const PhaseFilter = ({ phases, onFilterChange }: PhaseFilterProps) => {
       if (filteredSelected.includes(phase)) {
         // Remove the phase
         filteredSelected = filteredSelected.filter(p => p !== phase);
-        // If no phases selected, default to 'all'
-        if (filteredSelected.length === 0) {
-          filteredSelected = ['all'];
-        }
+        // Allow empty selection - don't force back to 'all'
       } else {
         // Add the phase
         filteredSelected = [...filteredSelected, phase];
