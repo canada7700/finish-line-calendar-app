@@ -1,5 +1,4 @@
-
-import { useMemo,useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ProjectPhase, ProjectNote, DailyNote } from '../types/project';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, startOfWeek, endOfWeek } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,16 +9,21 @@ import { useDailyNotes } from '@/hooks/useDailyNotes';
 import { usePhaseExceptions } from '@/hooks/usePhaseExceptions';
 import { useDailyHourAllocations } from '@/hooks/useDailyHourAllocations';
 import { useDailyPhaseCapacities, useDayCapacityInfo } from '@/hooks/useDailyCapacities';
+import { useProjectRescheduling } from '@/hooks/useProjectRescheduling';
 import DayDialog from './DayDialog';
+import DraggableProjectPhase from './DraggableProjectPhase';
+import DroppableCalendarDay from './DroppableCalendarDay';
 
 interface MonthViewProps {
   monthDate: Date;
   phases: ProjectPhase[];
   holidays: Holiday[];
+  onProjectDrop?: (phaseId: string, newDate: Date) => void;
 }
 
-const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
+const MonthView = ({ monthDate, phases, holidays, onProjectDrop }: MonthViewProps) => {
   const [dialogState, setDialogState] = useState<{ open: boolean; date: Date | null }>({ open: false, date: null });
+  const { rescheduleProject } = useProjectRescheduling();
   
   const monthStart = startOfMonth(monthDate);
   const monthEnd = endOfMonth(monthDate);
@@ -34,6 +38,7 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
   
   const holidaysMap = useMemo(() => new Map(holidays.map(h => [h.date, h.name])), [holidays]);
+  
   const projectNotesByDate = useMemo(() => {
     const map = new Map<string, ProjectNote[]>();
     projectNotes.forEach(note => {
@@ -63,12 +68,49 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
     return map;
   }, [phaseExceptions]);
 
-  // Hook to get allocations for each day in the month
   const dailyAllocationsMap = useMemo(() => {
     const map = new Map<string, any[]>();
-    // We'll fetch allocations for each day when needed in the component
     return map;
   }, []);
+
+  const phasesByProject = useMemo(() => {
+    const map = new Map<string, ProjectPhase[]>();
+    phases.forEach(phase => {
+      if (!map.has(phase.projectId)) {
+        map.set(phase.projectId, []);
+      }
+      map.get(phase.projectId)!.push(phase);
+    });
+    return map;
+  }, [phases]);
+
+  const handleProjectDrop = (phaseId: string, newDate: Date) => {
+    // Find the phase and project
+    const phase = phases.find(p => p.id === phaseId);
+    if (!phase || phase.phase !== 'install') return;
+
+    // Get all phases for this project to find the project data
+    const projectPhases = phasesByProject.get(phase.projectId) || [];
+    
+    // Create a mock project object from phase data
+    const project = {
+      id: phase.projectId,
+      jobName: phase.projectName,
+      jobDescription: '',
+      millworkHrs: projectPhases.filter(p => p.phase === 'millwork').reduce((sum, p) => sum + p.hours, 0),
+      boxConstructionHrs: projectPhases.filter(p => p.phase === 'boxConstruction').reduce((sum, p) => sum + p.hours, 0),
+      stainHrs: projectPhases.filter(p => p.phase === 'stain').reduce((sum, p) => sum + p.hours, 0),
+      installHrs: projectPhases.filter(p => p.phase === 'install').reduce((sum, p) => sum + p.hours, 0),
+      installDate: phase.startDate,
+      status: 'planning' as const
+    };
+
+    // Reschedule the project
+    rescheduleProject(project, newDate);
+    
+    // Call the optional callback
+    onProjectDrop?.(phaseId, newDate);
+  };
 
   const isNonWorkingDay = (date: Date) => {
     const isWeekendDay = isWeekend(date);
@@ -150,66 +192,77 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
               const dayDailyNote = dailyNotesByDate.get(dateString);
               const hasNotes = dayProjectNotes.some(n => n.note) || (dayDailyNote && dayDailyNote.note);
               
-              // Placeholder for capacity issues - would be calculated from actual allocations
               const hasCapacityIssues = false;
               
               return (
-                <div
+                <DroppableCalendarDay
                   key={day.toISOString()}
-                  className={getDayClasses(day, dayPhases, hasCapacityIssues)}
-                  onClick={() => handleDayClick(day)}
+                  date={day}
+                  holidays={holidaysMap}
+                  onProjectDrop={handleProjectDrop}
                 >
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <div className={`text-sm font-medium ${isCurrentMonth ? 'text-foreground' : 'text-gray-400'}`}>
-                        {format(day, 'd')}
+                  <div
+                    className={getDayClasses(day, dayPhases, hasCapacityIssues)}
+                    onClick={() => handleDayClick(day)}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <div className={`text-sm font-medium ${isCurrentMonth ? 'text-foreground' : 'text-gray-400'}`}>
+                          {format(day, 'd')}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {hasNotes && isCurrentMonth && (
+                            <MessageSquare className="h-3 w-3 text-blue-500" />
+                          )}
+                          {hasCapacityIssues && isCurrentMonth && (
+                            <Clock className="h-3 w-3 text-orange-500" />
+                          )}
+                          {hasSchedulingConflict && (
+                            <AlertTriangle className="h-3 w-3 text-red-500" />
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1">
-                        {hasNotes && isCurrentMonth && (
-                          <MessageSquare className="h-3 w-3 text-blue-500" />
-                        )}
-                        {hasCapacityIssues && isCurrentMonth && (
-                          <Clock className="h-3 w-3 text-orange-500" />
-                        )}
-                        {hasSchedulingConflict && (
-                          <AlertTriangle className="h-3 w-3 text-red-500" />
-                        )}
-                      </div>
+                      
+                      {nonWorkingInfo.isNonWorking && isCurrentMonth && (
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 truncate" title={nonWorkingInfo.reason}>
+                          {nonWorkingInfo.reason}
+                        </div>
+                      )}
+
+                      {isCurrentMonth && dayDailyNote?.note && (
+                        <div className="mt-1 text-xs text-muted-foreground break-words">
+                          <p className="line-clamp-2">{dayDailyNote.note}</p>
+                        </div>
+                      )}
                     </div>
                     
-                    {nonWorkingInfo.isNonWorking && isCurrentMonth && (
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 truncate" title={nonWorkingInfo.reason}>
-                        {nonWorkingInfo.reason}
-                      </div>
-                    )}
-
-                    {isCurrentMonth && dayDailyNote?.note && (
-                      <div className="mt-1 text-xs text-muted-foreground break-words">
-                        <p className="line-clamp-2">{dayDailyNote.note}</p>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-1 mt-auto pt-1">
-                    {dayPhases.map(phase => (
-                      <div
-                        key={phase.id}
-                        className={`text-xs p-1 rounded text-white ${phase.color} truncate ${hasSchedulingConflict ? 'border border-red-300' : ''}`}
-                        title={`${phase.projectName} - ${phase.phase.toUpperCase()} (${phase.hours}h)${hasSchedulingConflict ? ' - CONFLICT: Scheduled on ' + nonWorkingInfo.reason : ''}`}
-                      >
-                        {phase.projectName}
-                        <div className="text-[10px] opacity-90">
-                          {phase.phase.toUpperCase()}
-                        </div>
-                        {hasSchedulingConflict && (
-                          <div className="text-[10px] text-red-200">
-                            ⚠️ CONFLICT
+                    <div className="space-y-1 mt-auto pt-1">
+                      {dayPhases.map(phase => (
+                        <DraggableProjectPhase
+                          key={phase.id}
+                          phase={phase}
+                          hasSchedulingConflict={hasSchedulingConflict}
+                          conflictReason={nonWorkingInfo.reason}
+                        >
+                          <div
+                            className={`text-xs p-1 rounded text-white ${phase.color} truncate ${hasSchedulingConflict ? 'border border-red-300' : ''} relative`}
+                            title={`${phase.projectName} - ${phase.phase.toUpperCase()} (${phase.hours}h)${hasSchedulingConflict ? ' - CONFLICT: Scheduled on ' + nonWorkingInfo.reason : ''}`}
+                          >
+                            {phase.projectName}
+                            <div className="text-[10px] opacity-90">
+                              {phase.phase.toUpperCase()}
+                            </div>
+                            {hasSchedulingConflict && (
+                              <div className="text-[10px] text-red-200">
+                                ⚠️ CONFLICT
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    ))}
+                        </DraggableProjectPhase>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                </DroppableCalendarDay>
               );
             })}
           </div>
