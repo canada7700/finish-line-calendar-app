@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { ProjectPhase, ProjectNote, DailyNote } from '../types/project';
 import { format } from 'date-fns';
@@ -182,7 +181,7 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
       <HourAllocationDialog
         date={date}
         phases={phases}
-        selectedPhase={selectedPhase}
+        initialProjectPhase={selectedPhase}
         open={showHourAllocation}
         onOpenChange={setShowHourAllocation}
       />
