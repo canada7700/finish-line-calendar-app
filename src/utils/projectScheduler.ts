@@ -1,3 +1,4 @@
+
 import { addBusinessDays, subBusinessDays, isWeekend, format, parseISO, addDays } from 'date-fns';
 import { fromLocalToUTC, dateInputToUTC, createLocalDate } from './timezoneUtils';
 import type { Project, ProjectPhase } from '../types/project';
@@ -64,7 +65,7 @@ export const getProjectPhases = async (projects: Project[]): Promise<ProjectPhas
   const phases: ProjectPhase[] = [];
 
   projects.forEach((project) => {
-    const addPhase = (phase: string, date: string | null | undefined, duration: number, phaseHrs: number) => {
+    const addPhase = (phase: 'materialOrder' | 'millwork' | 'boxConstruction' | 'stain' | 'install', date: string | null | undefined, duration: number, phaseHrs: number) => {
       if (date) {
         phases.push({
           id: `${project.id}-${phase}`,
@@ -73,6 +74,8 @@ export const getProjectPhases = async (projects: Project[]): Promise<ProjectPhas
           phase: phase,
           startDate: date,
           endDate: ProjectScheduler.addBusinessDays(parseISO(date), Math.max(1, Math.ceil(phaseHrs / 8))).toISOString().split('T')[0],
+          hours: phaseHrs,
+          color: getPhaseColor(phase),
         });
       }
     };
@@ -86,3 +89,14 @@ export const getProjectPhases = async (projects: Project[]): Promise<ProjectPhas
 
   return phases;
 };
+
+function getPhaseColor(phase: 'materialOrder' | 'millwork' | 'boxConstruction' | 'stain' | 'install'): string {
+  const colorMap = {
+    materialOrder: '#ef4444',
+    millwork: '#3b82f6',
+    boxConstruction: '#10b981',
+    stain: '#f97316',
+    install: '#8b5cf6',
+  };
+  return colorMap[phase] || '#6b7280';
+}

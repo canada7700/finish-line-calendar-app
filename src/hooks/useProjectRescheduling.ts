@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { differenceInDays, parseISO } from 'date-fns';
 
-export const useProjectRescheduling = () => {
+export const useProjectRescheduling = (isDragging?: boolean) => {
   const queryClient = useQueryClient();
 
   const rescheduleProjectMutation = useMutation({
@@ -28,7 +28,7 @@ export const useProjectRescheduling = () => {
       };
 
       // Recalculate all project dates based on new install date
-      const recalculatedProject = await ProjectScheduler.calculateProjectDates(updatedProject);
+      const recalculatedProject = ProjectScheduler.calculateProjectDates(updatedProject);
       
       console.log('Recalculated project dates:', recalculatedProject);
 
@@ -121,8 +121,14 @@ export const useProjectRescheduling = () => {
     rescheduleProjectMutation.mutate({ project, newInstallDate });
   };
 
+  const applyPendingUpdates = () => {
+    // This function is no longer needed with the simplified approach
+    console.log('applyPendingUpdates called - no-op with new implementation');
+  };
+
   return {
     rescheduleProject,
     isRescheduling: rescheduleProjectMutation.isPending,
+    applyPendingUpdates,
   };
 };

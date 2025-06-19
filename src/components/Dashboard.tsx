@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useProjects } from '@/hooks/useProjects';
 import { getProjectPhases } from '@/utils/projectScheduler';
 import { ProjectPhase, Project } from '@/types/project';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CalendarDays, Users, Clock, AlertTriangle } from 'lucide-react';
-import { TeamWorkloadOverview } from './TeamWorkloadOverview';
+import TeamWorkloadOverview from './TeamWorkloadOverview';
 import { format, parseISO, isWithinInterval, startOfWeek, endOfWeek } from 'date-fns';
 
 const Dashboard = () => {
