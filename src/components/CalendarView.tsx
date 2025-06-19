@@ -18,6 +18,7 @@ export const CalendarView = ({ phases }: CalendarViewProps) => {
   const [activePhase, setActivePhase] = useState<ProjectPhase | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [hasUserNavigated, setHasUserNavigated] = useState(false);
+  const [hasCompletedInitialScroll, setHasCompletedInitialScroll] = useState(false);
   const { holidays, isLoading: isLoadingHolidays } = useHolidays();
   const { rescheduleProject, isRescheduling } = useProjectRescheduling();
 
@@ -27,7 +28,6 @@ export const CalendarView = ({ phases }: CalendarViewProps) => {
   
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const currentMonthRef = useRef<HTMLDivElement>(null);
-  const hasScrolledToCurrentMonth = useRef(false);
   const scrollPosition = useRef<number>(0);
 
   const loadPrevious = useCallback(() => {
@@ -60,7 +60,7 @@ export const CalendarView = ({ phases }: CalendarViewProps) => {
   // Restore scroll position after updates (but not during/after drag operations)
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current;
-    if (scrollContainer && hasScrolledToCurrentMonth.current && !isDragging && !isRescheduling) {
+    if (scrollContainer && hasCompletedInitialScroll && !isDragging && !isRescheduling) {
       // Small delay to ensure DOM has updated
       const timeoutId = setTimeout(() => {
         scrollContainer.scrollTop = scrollPosition.current;
@@ -68,7 +68,7 @@ export const CalendarView = ({ phases }: CalendarViewProps) => {
       
       return () => clearTimeout(timeoutId);
     }
-  }, [phases, isDragging, isRescheduling]);
+  }, [phases, isDragging, isRescheduling, hasCompletedInitialScroll]);
 
   useEffect(() => {
     const currentObserver = new IntersectionObserver((entries) => {
@@ -90,18 +90,16 @@ export const CalendarView = ({ phases }: CalendarViewProps) => {
     return () => currentObserver.disconnect();
   }, [loadPrevious, loadNext, isDragging, isRescheduling]);
 
-  // Only scroll to current month on initial load, not after user navigation or rescheduling
+  // Only scroll to current month on initial load - never after rescheduling
   useEffect(() => {
     if (!isLoadingHolidays && 
         currentMonthRef.current && 
-        !hasScrolledToCurrentMonth.current && 
-        !hasUserNavigated && 
-        !isDragging && 
-        !isRescheduling) {
+        !hasCompletedInitialScroll && 
+        !hasUserNavigated) {
       currentMonthRef.current.scrollIntoView({ block: 'start' });
-      hasScrolledToCurrentMonth.current = true;
+      setHasCompletedInitialScroll(true);
     }
-  }, [isLoadingHolidays, hasUserNavigated, isDragging, isRescheduling]);
+  }, [isLoadingHolidays, hasUserNavigated, hasCompletedInitialScroll]);
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
