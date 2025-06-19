@@ -1,7 +1,17 @@
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ChevronDown, Filter } from 'lucide-react';
 import { ProjectPhase } from '@/types/project';
 
 interface PhaseFilterProps {
@@ -69,63 +79,86 @@ export const PhaseFilter = ({ phases, onFilterChange }: PhaseFilterProps) => {
     return selectedPhases.includes('all') || selectedPhases.includes(phase);
   };
 
+  const getFilterButtonText = () => {
+    if (selectedPhases.includes('all') || selectedPhases.length === 0) {
+      return 'All Phases';
+    }
+    if (selectedPhases.length === 1) {
+      const phase = selectedPhases[0];
+      return PHASE_CONFIG[phase as keyof typeof PHASE_CONFIG]?.label || phase;
+    }
+    return `${selectedPhases.length} phases selected`;
+  };
+
   return (
-    <div className="sticky top-0 z-10 bg-background border-b border-border p-4 space-y-3">
+    <div className="sticky top-0 z-10 bg-background border-b border-border p-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium">Filter by Phase</h3>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={clearAll}>
-            Clear All
-          </Button>
-          <Button variant="outline" size="sm" onClick={selectAll}>
-            Select All
-          </Button>
-        </div>
-      </div>
-      
-      <div className="flex flex-wrap gap-2">
-        {Object.entries(PHASE_CONFIG).map(([phaseKey, config]) => {
-          if (phaseKey === 'all') {
-            return (
-              <Button
-                key={phaseKey}
-                variant={isSelected(phaseKey) ? "default" : "outline"}
-                size="sm"
-                onClick={() => handlePhaseToggle(phaseKey)}
-                className="flex items-center gap-2"
-              >
-                <div className={`w-3 h-3 rounded ${config.color}`} />
-                {config.label}
-                <Badge variant="secondary" className="ml-1">
-                  {phases.length}
-                </Badge>
-              </Button>
-            );
-          }
-          
-          const count = phaseCounts[phaseKey] || 0;
-          if (count === 0) return null;
-          
-          return (
-            <Button
-              key={phaseKey}
-              variant={isSelected(phaseKey) ? "default" : "outline"}
-              size="sm"
-              onClick={() => handlePhaseToggle(phaseKey)}
-              className="flex items-center gap-2"
-            >
-              <div className={`w-3 h-3 rounded ${config.color}`} />
-              {config.label}
-              <Badge variant="secondary" className="ml-1">
-                {count}
-              </Badge>
+        <h3 className="text-sm font-medium">Project Timeline</h3>
+        
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="flex items-center gap-2">
+              <Filter className="h-4 w-4" />
+              {getFilterButtonText()}
+              <ChevronDown className="h-4 w-4" />
             </Button>
-          );
-        })}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-64 bg-background">
+            <DropdownMenuLabel>Filter by Phase</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            
+            <DropdownMenuItem onClick={selectAll} className="cursor-pointer">
+              <Checkbox
+                checked={selectedPhases.includes('all')}
+                className="mr-2"
+              />
+              <div className={`w-3 h-3 rounded mr-2 ${PHASE_CONFIG.all.color}`} />
+              <span className="flex-1">All Phases</span>
+              <Badge variant="secondary" className="ml-2">
+                {phases.length}
+              </Badge>
+            </DropdownMenuItem>
+            
+            <DropdownMenuItem onClick={clearAll} className="cursor-pointer">
+              <Checkbox
+                checked={selectedPhases.length === 0}
+                className="mr-2"
+              />
+              <span className="ml-5">None</span>
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            {Object.entries(PHASE_CONFIG).map(([phaseKey, config]) => {
+              if (phaseKey === 'all') return null;
+              
+              const count = phaseCounts[phaseKey] || 0;
+              if (count === 0) return null;
+              
+              return (
+                <DropdownMenuItem
+                  key={phaseKey}
+                  onClick={() => handlePhaseToggle(phaseKey)}
+                  className="cursor-pointer"
+                >
+                  <Checkbox
+                    checked={isSelected(phaseKey)}
+                    className="mr-2"
+                  />
+                  <div className={`w-3 h-3 rounded mr-2 ${config.color}`} />
+                  <span className="flex-1">{config.label}</span>
+                  <Badge variant="secondary" className="ml-2">
+                    {count}
+                  </Badge>
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       
       {selectedPhases.length > 0 && !selectedPhases.includes('all') && (
-        <div className="text-sm text-muted-foreground">
+        <div className="text-sm text-muted-foreground mt-2">
           Showing {selectedPhases.length} phase type{selectedPhases.length !== 1 ? 's' : ''}
         </div>
       )}
