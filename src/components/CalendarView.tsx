@@ -14,8 +14,8 @@ interface CalendarViewProps {
   onDragStateChange?: (isDragging: boolean) => void;
 }
 
-const SCROLL_POSITION_KEY = 'calendar-scroll-position';
 const MONTHS_STATE_KEY = 'calendar-months-state';
+const CURRENT_MONTH_KEY = 'calendar-current-month';
 
 export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) => {
   // Initialize monthsToRender from localStorage or default to current month
@@ -32,10 +32,22 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
     return [new Date()];
   });
 
+  // Track the current month the user is viewing
+  const [currentViewMonth, setCurrentViewMonth] = useState(() => {
+    try {
+      const saved = localStorage.getItem(CURRENT_MONTH_KEY);
+      if (saved) {
+        return new Date(saved);
+      }
+    } catch (e) {
+      console.log('Could not restore current month:', e);
+    }
+    return new Date();
+  });
+
   const [activePhase, setActivePhase] = useState<ProjectPhase | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [hasCompletedInitialScroll, setHasCompletedInitialScroll] = useState(() => {
-    // Check if we've already done initial scroll in this session
     return sessionStorage.getItem('calendar-initial-scroll-done') === 'true';
   });
   
@@ -45,9 +57,8 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
   const observer = useRef<IntersectionObserver>();
   const topSentinelRef = useRef<HTMLDivElement>(null);
   const bottomSentinelRef = useRef<HTMLDivElement>(null);
-  
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const currentMonthRef = useRef<HTMLDivElement>(null);
+  const monthRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   // Save monthsToRender to localStorage whenever it changes
   useEffect(() => {
@@ -57,6 +68,15 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
       console.log('Could not save months state:', e);
     }
   }, [monthsToRender]);
+
+  // Save current view month to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(CURRENT_MONTH_KEY, currentViewMonth.toISOString());
+    } catch (e) {
+      console.log('Could not save current month:', e);
+    }
+  }, [currentViewMonth]);
 
   const loadPrevious = useCallback(() => {
     console.log('Loading previous month');
@@ -68,46 +88,51 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
     setMonthsToRender(prev => [...prev, addMonths(prev[prev.length - 1], 1)]);
   }, []);
 
-  // Save scroll position to localStorage whenever user scrolls
+  // Intersection observer to track which months are visible and detect current view month
   useEffect(() => {
-    const scrollContainer = scrollContainerRef.current;
-    if (scrollContainer) {
-      const handleScroll = () => {
-        const scrollTop = scrollContainer.scrollTop;
-        try {
-          localStorage.setItem(SCROLL_POSITION_KEY, scrollTop.toString());
-        } catch (e) {
-          console.log('Could not save scroll position:', e);
+    const monthObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
+          // Find which month this element represents
+          const monthKey = entry.target.getAttribute('data-month');
+          if (monthKey) {
+            const month = new Date(monthKey);
+            console.log('Month in view:', format(month, 'MMMM yyyy'));
+            setCurrentViewMonth(month);
+          }
         }
-      };
-      
-      scrollContainer.addEventListener('scroll', handleScroll);
-      return () => scrollContainer.removeEventListener('scroll', handleScroll);
+      });
+    }, { threshold: [0.5] });
+
+    // Observe all month elements
+    monthRefs.current.forEach((element) => {
+      monthObserver.observe(element);
+    });
+
+    return () => monthObserver.disconnect();
+  }, [monthsToRender]);
+
+  // Scroll to specific month
+  const scrollToMonth = useCallback((targetMonth: Date) => {
+    const monthKey = targetMonth.toISOString();
+    const monthElement = monthRefs.current.get(monthKey);
+    
+    if (monthElement && scrollContainerRef.current) {
+      console.log('Scrolling to month:', format(targetMonth, 'MMMM yyyy'));
+      monthElement.scrollIntoView({ block: 'start', behavior: 'smooth' });
     }
   }, []);
 
-  // Restore scroll position from localStorage after phases update (but not during drag)
+  // Restore view to current month after phases update (but not during drag or initial load)
   useEffect(() => {
-    const scrollContainer = scrollContainerRef.current;
-    if (scrollContainer && !isDragging && !isRescheduling && hasCompletedInitialScroll) {
-      console.log('Restoring scroll position from localStorage after phases update');
-      try {
-        const savedPosition = localStorage.getItem(SCROLL_POSITION_KEY);
-        if (savedPosition) {
-          const position = parseInt(savedPosition, 10);
-          if (!isNaN(position)) {
-            // Small delay to ensure DOM has updated
-            setTimeout(() => {
-              console.log('Setting scroll position to:', position);
-              scrollContainer.scrollTop = position;
-            }, 50);
-          }
-        }
-      } catch (e) {
-        console.log('Could not restore scroll position:', e);
-      }
+    if (!isDragging && !isRescheduling && hasCompletedInitialScroll) {
+      console.log('Restoring view to current month after phases update');
+      // Small delay to ensure DOM has updated
+      setTimeout(() => {
+        scrollToMonth(currentViewMonth);
+      }, 100);
     }
-  }, [phases, isDragging, isRescheduling, hasCompletedInitialScroll]);
+  }, [phases, isDragging, isRescheduling, hasCompletedInitialScroll, currentViewMonth, scrollToMonth]);
 
   useEffect(() => {
     const currentObserver = new IntersectionObserver((entries) => {
@@ -131,37 +156,26 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
 
   // Only scroll to current month on VERY FIRST load - never again
   useEffect(() => {
-    if (!isLoadingHolidays && 
-        currentMonthRef.current && 
-        !hasCompletedInitialScroll && 
-        !isDragging && 
-        !isRescheduling) {
-      
+    if (!isLoadingHolidays && !hasCompletedInitialScroll && !isDragging && !isRescheduling) {
       console.log('Performing INITIAL scroll to current month - this should only happen once per session');
       
-      // Try to restore scroll position first
-      try {
-        const savedPosition = localStorage.getItem(SCROLL_POSITION_KEY);
-        if (savedPosition) {
-          const position = parseInt(savedPosition, 10);
-          if (!isNaN(position) && position > 0) {
-            console.log('Restoring saved scroll position instead of scrolling to current month');
-            scrollContainerRef.current!.scrollTop = position;
-            setHasCompletedInitialScroll(true);
-            sessionStorage.setItem('calendar-initial-scroll-done', 'true');
-            return;
-          }
-        }
-      } catch (e) {
-        console.log('Could not check saved scroll position:', e);
+      const currentMonth = new Date();
+      // Check if current month is in our monthsToRender, if not add it
+      const hasCurrentMonth = monthsToRender.some(month => isSameMonth(month, currentMonth));
+      
+      if (!hasCurrentMonth) {
+        console.log('Adding current month to rendered months');
+        setMonthsToRender(prev => [...prev, currentMonth].sort((a, b) => a.getTime() - b.getTime()));
       }
-
-      // If no saved position, scroll to current month
-      currentMonthRef.current.scrollIntoView({ block: 'start' });
-      setHasCompletedInitialScroll(true);
-      sessionStorage.setItem('calendar-initial-scroll-done', 'true');
+      
+      setTimeout(() => {
+        scrollToMonth(currentMonth);
+        setCurrentViewMonth(currentMonth);
+        setHasCompletedInitialScroll(true);
+        sessionStorage.setItem('calendar-initial-scroll-done', 'true');
+      }, 200);
     }
-  }, [isLoadingHolidays, hasCompletedInitialScroll, isDragging, isRescheduling]);
+  }, [isLoadingHolidays, hasCompletedInitialScroll, isDragging, isRescheduling, monthsToRender, scrollToMonth]);
 
   const handleDragStart = (event: DragStartEvent) => {
     console.log('Drag start - preventing calendar reset');
@@ -250,9 +264,19 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
         
         {!isLoadingHolidays ? (
           monthsToRender.map(month => {
-            const isCurrent = isSameMonth(month, new Date());
+            const monthKey = month.toISOString();
             return (
-              <div key={month.toISOString()} ref={isCurrent ? currentMonthRef : null}>
+              <div 
+                key={monthKey} 
+                ref={(el) => {
+                  if (el) {
+                    monthRefs.current.set(monthKey, el);
+                  } else {
+                    monthRefs.current.delete(monthKey);
+                  }
+                }}
+                data-month={monthKey}
+              >
                 <MonthView monthDate={month} phases={phases} holidays={holidays} />
               </div>
             );
