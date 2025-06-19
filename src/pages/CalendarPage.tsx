@@ -1,65 +1,100 @@
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useProjects } from '@/hooks/useProjects';
-import { useHolidays } from '@/hooks/useHolidays';
-import { getProjectPhases, ProjectScheduler } from '@/utils/projectScheduler';
+import { getProjectPhases } from '@/utils/projectScheduler';
 import { CalendarView } from '@/components/CalendarView';
 import { ProjectPhase } from '@/types/project';
 import { Skeleton } from "@/components/ui/skeleton";
 
 const CalendarPage = () => {
   const { projects, isLoading: isLoadingProjects } = useProjects();
-  const { holidays, isLoading: isLoadingHolidays } = useHolidays();
   const [phases, setPhases] = useState<ProjectPhase[]>([]);
   const [isLoadingPhases, setIsLoadingPhases] = useState(true);
+  const [isDragInProgress, setIsDragInProgress] = useState(false);
+  
+  const phasesRef = useRef<ProjectPhase[]>([]);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout>();
 
   const memoizedProjects = useMemo(() => projects, [projects]);
-  const memoizedHolidays = useMemo(() => holidays, [holidays]);
 
-  // Calculate phases when projects OR holidays change
-  useEffect(() => {
-    const calculatePhases = async () => {
-      // Wait for both projects and holidays to be loaded
-      if (!isLoadingProjects && !isLoadingHolidays && memoizedProjects && memoizedHolidays) {
-        console.log('=== STARTING PHASE CALCULATION ===');
-        console.log('Projects loaded:', memoizedProjects.length);
-        console.log('Holidays loaded:', memoizedHolidays.length);
-        
+  const phasesAreEqual = useCallback((oldPhases: ProjectPhase[], newPhases: ProjectPhase[]) => {
+    if (oldPhases.length !== newPhases.length) return false;
+    
+    for (let i = 0; i < oldPhases.length; i++) {
+      const oldPhase = oldPhases[i];
+      const newPhase = newPhases[i];
+      
+      if (oldPhase.id !== newPhase.id ||
+          oldPhase.startDate !== newPhase.startDate ||
+          oldPhase.endDate !== newPhase.endDate ||
+          oldPhase.projectId !== newPhase.projectId) {
+        return false;
+      }
+    }
+    return true;
+  }, []);
+
+  const updatePhasesDebounced = useCallback((newProjects: typeof projects) => {
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    // Use very long delay during drag to prevent any updates - this is the key fix
+    const debounceDelay = isDragInProgress ? 30000 : 300;
+
+    debounceTimeoutRef.current = setTimeout(async () => {
+      if (newProjects && newProjects.length > 0) {
+        console.log('Updating phases after debounce (drag in progress:', isDragInProgress, ')');
         setIsLoadingPhases(true);
-        
         try {
-          // Set holidays in ProjectScheduler BEFORE calculating phases
-          const holidayDates = memoizedHolidays.map(h => h.date);
-          ProjectScheduler.setHolidays(holidayDates);
+          const newPhases = await getProjectPhases(newProjects);
           
-          // Now calculate phases with holidays properly set
-          const newPhases = await getProjectPhases(memoizedProjects);
-          setPhases(newPhases);
-          console.log('Phases calculated successfully:', newPhases.length);
-        } catch (error) {
-          console.error('Error calculating phases:', error);
+          if (!phasesAreEqual(phasesRef.current, newPhases)) {
+            console.log('Phases changed, updating state');
+            setPhases(newPhases);
+            phasesRef.current = newPhases;
+          } else {
+            console.log('Phases unchanged, skipping update');
+          }
         } finally {
           setIsLoadingPhases(false);
         }
-      } else {
-        console.log('Waiting for data to load...', {
-          projectsLoading: isLoadingProjects,
-          holidaysLoading: isLoadingHolidays,
-          hasProjects: !!memoizedProjects,
-          hasHolidays: !!memoizedHolidays
-        });
-        
-        if (!isLoadingProjects && !isLoadingHolidays) {
-          setPhases([]);
-          setIsLoadingPhases(false);
-        }
+      } else if (!isLoadingProjects) {
+        setPhases([]);
+        phasesRef.current = [];
+        setIsLoadingPhases(false);
+      }
+    }, debounceDelay);
+  }, [phasesAreEqual, isLoadingProjects, isDragInProgress]);
+
+  useEffect(() => {
+    // Skip phase recalculation completely if drag is in progress
+    if (isDragInProgress) {
+      console.log('Skipping phase update - drag in progress');
+      return;
+    }
+
+    updatePhasesDebounced(memoizedProjects);
+
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
       }
     };
+  }, [memoizedProjects, updatePhasesDebounced, isDragInProgress]);
 
-    calculatePhases();
-  }, [memoizedProjects, memoizedHolidays, isLoadingProjects, isLoadingHolidays]);
+  const handleDragStateChange = useCallback((dragging: boolean) => {
+    console.log('Drag state changed:', dragging);
+    setIsDragInProgress(dragging);
+    
+    // Clear any pending debounced updates when drag starts
+    if (dragging && debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+      console.log('Cleared pending phase updates due to drag start');
+    }
+  }, []);
 
-  const isLoading = isLoadingProjects || isLoadingHolidays || isLoadingPhases;
+  const isLoading = isLoadingProjects || isLoadingPhases;
 
   return (
     <div className="h-[calc(100vh-4rem)]">
@@ -69,7 +104,10 @@ const CalendarPage = () => {
           <Skeleton className="h-[70vh] w-full" />
         </div>
       ) : (
-        <CalendarView phases={phases} />
+        <CalendarView 
+          phases={phases} 
+          onDragStateChange={handleDragStateChange}
+        />
       )}
     </div>
   );

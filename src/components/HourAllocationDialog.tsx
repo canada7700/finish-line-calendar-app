@@ -109,7 +109,6 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
     
     return hourBlocks.map(hour => {
       // Check if ANY of the selected team members are already allocated for this hour (any project/phase)
-      // With the new database constraint, this prevents all double-booking
       const isAlreadyAllocated = selectedTeamMembers.some(teamMemberId =>
         allocations.some(alloc => 
           alloc.hourBlock === hour && 
@@ -233,7 +232,6 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
           if (memberCurrentAllocations >= 9) break; // Don't exceed 9 hours per person
           
           // Check if this member is already allocated for this hour (ANY project/phase)
-          // The database constraint now prevents this automatically
           const isAlreadyAllocated = allocations.some(alloc => 
             alloc.hourBlock === hour && 
             alloc.teamMemberId === member.id
@@ -253,9 +251,9 @@ const HourAllocationDialog = ({ date, phases, open, onOpenChange }: HourAllocati
               allocationsAdded++;
               setAutoFillProgress(allocationsAdded);
             } catch (error: any) {
-              // The database constraint will now prevent double-booking automatically
+              // If we hit a double-booking constraint error, skip this allocation
               if (error.message?.includes('duplicate key value') || error.message?.includes('unique constraint')) {
-                console.warn(`Database prevented double-booking for ${member.name} at hour ${hour}`);
+                console.warn(`Skipping double-booking for ${member.name} at hour ${hour}`);
                 continue;
               }
               throw error;

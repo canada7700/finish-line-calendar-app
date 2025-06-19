@@ -29,10 +29,12 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
 
   const [activePhase, setActivePhase] = useState<ProjectPhase | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [savedScrollPosition, setSavedScrollPosition] = useState<number | null>(null);
   const [selectedPhases, setSelectedPhases] = useState<string[]>(['all']);
+  const [scrollLocked, setScrollLocked] = useState(false);
   
   const { holidays, isLoading: isLoadingHolidays } = useHolidays();
-  const { rescheduleProject, isRescheduling } = useProjectRescheduling();
+  const { rescheduleProject, isRescheduling, applyPendingUpdates } = useProjectRescheduling(isDragging);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -48,9 +50,72 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
     setSelectedPhases(newSelectedPhases);
   };
 
+  const lockScrollPosition = () => {
+    if (scrollContainerRef.current) {
+      const currentPosition = scrollContainerRef.current.scrollTop;
+      setSavedScrollPosition(currentPosition);
+      setScrollLocked(true);
+      console.log('Scroll locked at position:', currentPosition);
+      
+      // Prevent any scroll events during the lock
+      const scrollHandler = (e: Event) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = currentPosition;
+        }
+      };
+      
+      scrollContainerRef.current.addEventListener('scroll', scrollHandler, { passive: false });
+      
+      // Store the handler to remove it later
+      (scrollContainerRef.current as any)._lockHandler = scrollHandler;
+    }
+  };
+
+  const unlockScrollPosition = () => {
+    if (scrollContainerRef.current && scrollLocked) {
+      const scrollHandler = (scrollContainerRef.current as any)._lockHandler;
+      if (scrollHandler) {
+        scrollContainerRef.current.removeEventListener('scroll', scrollHandler);
+        delete (scrollContainerRef.current as any)._lockHandler;
+      }
+      
+      if (savedScrollPosition !== null) {
+        // Use multiple requestAnimationFrame calls for better timing
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              if (scrollContainerRef.current && savedScrollPosition !== null) {
+                console.log('Restoring scroll position to:', savedScrollPosition);
+                scrollContainerRef.current.scrollTop = savedScrollPosition;
+                setSavedScrollPosition(null);
+                setScrollLocked(false);
+                
+                // Apply any pending cache updates after scroll is restored
+                setTimeout(() => {
+                  applyPendingUpdates();
+                }, 100);
+              }
+            });
+          });
+        });
+      } else {
+        setScrollLocked(false);
+        // Apply any pending cache updates
+        setTimeout(() => {
+          applyPendingUpdates();
+        }, 100);
+      }
+    }
+  };
+
   const handleDragStart = (event: DragStartEvent) => {
-    console.log('Drag start');
+    console.log('Drag start - locking scroll position and preventing cache updates');
     const { active } = event;
+    
+    // Lock the scroll position immediately
+    lockScrollPosition();
     
     if (active.data.current?.type === 'project-phase') {
       setActivePhase(active.data.current.phase);
@@ -60,48 +125,59 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
-    console.log('Drag end');
+    console.log('Drag end - preparing to restore scroll position and apply cache updates');
     const { active, over } = event;
     
     setActivePhase(null);
     setIsDragging(false);
     onDragStateChange?.(false);
 
-    if (!over || over.data.current?.type !== 'calendar-day') {
-      return;
-    }
-
-    const dropDate = over.data.current.date;
-    const isValidDropTarget = over.data.current.isValidDropTarget;
-
-    if (!isValidDropTarget) {
-      console.log('Cannot drop on non-working day');
-      return;
-    }
-
-    if (active.data.current?.type === 'project-phase') {
-      const phase = active.data.current.phase as ProjectPhase;
-      
-      // Only handle install phases (which are our drag handles)
-      if (phase.phase === 'install') {
-        // Find the project and reschedule it
-        const projectPhases = phases.filter(p => p.projectId === phase.projectId);
-        
-        const project = {
-          id: phase.projectId,
-          jobName: phase.projectName,
-          jobDescription: '',
-          millworkHrs: projectPhases.filter(p => p.phase === 'millwork').reduce((sum, p) => sum + (p.hours || 0), 0),
-          boxConstructionHrs: projectPhases.filter(p => p.phase === 'boxConstruction').reduce((sum, p) => sum + (p.hours || 0), 0),
-          stainHrs: projectPhases.filter(p => p.phase === 'stain').reduce((sum, p) => sum + (p.hours || 0), 0),
-          installHrs: projectPhases.filter(p => p.phase === 'install').reduce((sum, p) => sum + (p.hours || 0), 0),
-          installDate: phase.startDate,
-          status: 'planning' as const
-        };
-
-        rescheduleProject(project, new Date(dropDate));
+    // Delay any database operations until after scroll is restored
+    const performReschedule = () => {
+      if (!over || over.data.current?.type !== 'calendar-day') {
+        return;
       }
-    }
+
+      const dropDate = over.data.current.date;
+      const isValidDropTarget = over.data.current.isValidDropTarget;
+
+      if (!isValidDropTarget) {
+        console.log('Cannot drop on non-working day');
+        return;
+      }
+
+      if (active.data.current?.type === 'project-phase') {
+        const phase = active.data.current.phase as ProjectPhase;
+        
+        // Only handle install phases (which are our drag handles)
+        if (phase.phase === 'install') {
+          // Find the project and reschedule it
+          const projectPhases = phases.filter(p => p.projectId === phase.projectId);
+          
+          const project = {
+            id: phase.projectId,
+            jobName: phase.projectName,
+            jobDescription: '',
+            millworkHrs: projectPhases.filter(p => p.phase === 'millwork').reduce((sum, p) => sum + p.hours, 0),
+            boxConstructionHrs: projectPhases.filter(p => p.phase === 'boxConstruction').reduce((sum, p) => sum + p.hours, 0),
+            stainHrs: projectPhases.filter(p => p.phase === 'stain').reduce((sum, p) => sum + p.hours, 0),
+            installHrs: projectPhases.filter(p => p.phase === 'install').reduce((sum, p) => sum + p.hours, 0),
+            installDate: phase.startDate,
+            status: 'planning' as const
+          };
+
+          rescheduleProject(project, dropDate);
+        }
+      }
+    };
+
+    // First restore scroll position, then perform the reschedule
+    unlockScrollPosition();
+    
+    // Delay the reschedule operation to allow scroll restoration to complete
+    setTimeout(() => {
+      performReschedule();
+    }, 100);
   };
 
   return (

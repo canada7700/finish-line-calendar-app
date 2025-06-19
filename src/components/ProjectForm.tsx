@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { CalendarIcon, AlertTriangle, Users } from 'lucide-react';
 import { format, isWeekend, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { ProjectScheduler } from '../utils/projectScheduler';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ProjectAssignmentManager } from './ProjectAssignmentManager';
@@ -68,7 +69,7 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false, projectToEdit =
     }
   }, [projectToEdit, isEditing]);
 
-  const handleInstallDateSelect = (date: Date | undefined) => {
+  const handleInstallDateSelect = async (date: Date | undefined) => {
     setInstallDate(date);
     if (date) {
       setMaterialOrderDate(subDays(date, 60));
@@ -77,8 +78,16 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false, projectToEdit =
     }
     setDateWarning('');
     
-    if (date && isWeekend(date)) {
-      setDateWarning('Selected date is a weekend. Consider selecting a weekday instead.');
+    if (date) {
+      await ProjectScheduler.loadHolidays();
+      const validation = ProjectScheduler.validateWorkingDay(date);
+      
+      if (!validation.isValid && validation.suggestedDate) {
+        const reason = isWeekend(date) ? 'weekend' : 'holiday';
+        setDateWarning(
+          `Selected date is a ${reason}. Consider ${format(validation.suggestedDate, 'MMMM do, yyyy')} instead.`
+        );
+      }
     }
   };
 
