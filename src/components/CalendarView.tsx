@@ -4,7 +4,6 @@ import { ProjectPhase } from '../types/project';
 import { addMonths, format } from 'date-fns';
 import { useHolidays } from '@/hooks/useHolidays';
 import { useProjectRescheduling } from '@/hooks/useProjectRescheduling';
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent } from '@dnd-kit/core';
 import MonthView from "./MonthView";
@@ -54,18 +53,25 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
     const currentMonthId = `month-${format(new Date(), 'yyyy-MM')}`;
     const scrollContainer = scrollContainerRef.current;
 
+    console.log('Auto-scroll: Looking for current month:', currentMonthId);
+
     if (scrollContainer) {
-      // Use a small timeout to ensure all month elements have rendered
+      // Use a longer timeout to ensure all month elements have rendered
       setTimeout(() => {
         const currentMonthElement = document.getElementById(currentMonthId);
+        console.log('Auto-scroll: Current month element found:', !!currentMonthElement);
+        
         if (currentMonthElement) {
           const containerTop = scrollContainer.getBoundingClientRect().top;
           const elementTop = currentMonthElement.getBoundingClientRect().top;
           const scrollOffset = elementTop - containerTop;
 
+          console.log('Auto-scroll: Scrolling to offset:', scrollOffset);
           scrollContainer.scrollTop = scrollOffset;
+        } else {
+          console.log('Auto-scroll: Current month element not found');
         }
-      }, 150); // A small delay can help ensure rendering is complete
+      }, 300); // Increased timeout for better reliability
     }
   }, []); // The empty dependency array ensures this runs only once
 
@@ -158,7 +164,10 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
       <div className="h-full flex flex-col">
         <PhaseFilter phases={phases} onFilterChange={handleFilterChange} />
         
-        <ScrollArea className="flex-1 p-4 md:p-6" ref={scrollContainerRef}>
+        <div 
+          ref={scrollContainerRef}
+          className="flex-1 p-4 md:p-6 overflow-y-auto"
+        >
           <div className="flex items-start gap-2 p-3 mb-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/30 rounded-md">
             <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5" />
             <div className="text-sm">
@@ -192,7 +201,7 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
               <Loader2 className="h-8 w-8 animate-spin" />
             </div>
           )}
-        </ScrollArea>
+        </div>
       </div>
 
       <DragOverlay>
