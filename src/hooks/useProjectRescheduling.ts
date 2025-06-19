@@ -7,9 +7,11 @@ import { Project } from '@/types/project';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { differenceInDays, parseISO } from 'date-fns';
+import { useHolidays } from '@/hooks/useHolidays';
 
 export const useProjectRescheduling = (isDragging?: boolean) => {
   const queryClient = useQueryClient();
+  const { holidays } = useHolidays();
 
   const rescheduleProjectMutation = useMutation({
     mutationFn: async ({ 
@@ -19,7 +21,17 @@ export const useProjectRescheduling = (isDragging?: boolean) => {
       project: Project; 
       newInstallDate: Date; 
     }) => {
-      console.log('Rescheduling project:', project.jobName, 'to new install date:', newInstallDate);
+      console.log('=== RESCHEDULING PROJECT ===');
+      console.log('Project:', project.jobName, 'to new install date:', newInstallDate);
+      
+      // Ensure holidays are set in ProjectScheduler before rescheduling
+      if (holidays && holidays.length > 0) {
+        const holidayDates = holidays.map(h => h.date);
+        ProjectScheduler.setHolidays(holidayDates);
+        console.log('Holidays set for rescheduling:', holidayDates);
+      } else {
+        console.warn('No holidays available for rescheduling - this may cause issues');
+      }
       
       // Convert the new install date to UTC string for calculations
       const updatedProject = {
@@ -46,6 +58,7 @@ export const useProjectRescheduling = (isDragging?: boolean) => {
         throw error;
       }
 
+      console.log('=== RESCHEDULING COMPLETE ===');
       return recalculatedProject;
     },
     onMutate: async ({ project, newInstallDate }) => {

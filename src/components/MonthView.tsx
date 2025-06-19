@@ -1,6 +1,6 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { ProjectPhase, ProjectNote, DailyNote } from '../types/project';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, startOfWeek, endOfWeek, parseISO, isWithinInterval, isSameDay } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, startOfWeek, endOfWeek, parseISO, isSameDay } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertTriangle, MessageSquare, Clock } from 'lucide-react';
 import { Holiday } from '@/hooks/useHolidays';
@@ -38,7 +38,7 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
   
   const holidaysMap = useMemo(() => new Map(holidays.map(h => [h.date, h.name])), [holidays]);
-  
+
   // Update ProjectScheduler with current holidays when they change
   useEffect(() => {
     const holidayDates = holidays.map(h => h.date);

@@ -1,6 +1,5 @@
 
-import { addBusinessDays, subBusinessDays, isWeekend, format, parseISO, addDays } from 'date-fns';
-import { fromLocalToUTC, dateInputToUTC, createLocalDate } from './timezoneUtils';
+import { addDays, isWeekend, format, parseISO } from 'date-fns';
 import type { Project, ProjectPhase } from '../types/project';
 
 export class ProjectScheduler {
@@ -9,22 +8,40 @@ export class ProjectScheduler {
 
   static setHolidays(holidayDates: string[]) {
     this.holidays = new Set(holidayDates);
+    console.log('ProjectScheduler holidays set:', Array.from(this.holidays));
   }
 
-  // Business days calculation that skips weekends AND holidays
+  static isBusinessDay(date: Date): boolean {
+    const dateString = format(date, 'yyyy-MM-dd');
+    const isWeekendDay = isWeekend(date);
+    const isHoliday = this.holidays.has(dateString);
+    
+    console.log(`Checking if ${dateString} is business day:`, {
+      isWeekend: isWeekendDay,
+      isHoliday: isHoliday,
+      isBusinessDay: !isWeekendDay && !isHoliday
+    });
+    
+    return !isWeekendDay && !isHoliday;
+  }
+
+  // Custom business days calculation that skips weekends AND holidays
   static addBusinessDays(startDate: Date, days: number): Date {
     let currentDate = new Date(startDate);
     let businessDaysAdded = 0;
     
+    console.log(`Adding ${days} business days from ${format(startDate, 'yyyy-MM-dd')}`);
+    
     while (businessDaysAdded < days) {
       currentDate = addDays(currentDate, 1);
-      const dateString = format(currentDate, 'yyyy-MM-dd');
       
-      if (!isWeekend(currentDate) && !this.holidays.has(dateString)) {
+      if (this.isBusinessDay(currentDate)) {
         businessDaysAdded++;
+        console.log(`Business day ${businessDaysAdded}/${days}: ${format(currentDate, 'yyyy-MM-dd')}`);
       }
     }
     
+    console.log(`Final date after adding ${days} business days: ${format(currentDate, 'yyyy-MM-dd')}`);
     return currentDate;
   }
 
@@ -32,24 +49,35 @@ export class ProjectScheduler {
     let currentDate = new Date(startDate);
     let businessDaysSubtracted = 0;
     
+    console.log(`Subtracting ${days} business days from ${format(startDate, 'yyyy-MM-dd')}`);
+    
     while (businessDaysSubtracted < days) {
       currentDate = addDays(currentDate, -1);
-      const dateString = format(currentDate, 'yyyy-MM-dd');
       
-      if (!isWeekend(currentDate) && !this.holidays.has(dateString)) {
+      if (this.isBusinessDay(currentDate)) {
         businessDaysSubtracted++;
+        console.log(`Business day ${businessDaysSubtracted}/${days}: ${format(currentDate, 'yyyy-MM-dd')}`);
       }
     }
     
+    console.log(`Final date after subtracting ${days} business days: ${format(currentDate, 'yyyy-MM-dd')}`);
     return currentDate;
   }
 
   static calculateProjectDates(project: Project): Project {
-    // Parse install date directly as UTC since it's already stored as UTC in database
-    const installDate = parseISO(project.installDate + 'T00:00:00Z');
+    console.log('=== CALCULATING PROJECT DATES ===');
+    console.log('Project:', project.jobName);
+    console.log('Install date input:', project.installDate);
+    console.log('Available holidays:', Array.from(this.holidays));
     
-    console.log('Calculating project dates for:', project.jobName);
+    // Parse install date as UTC
+    const installDate = parseISO(project.installDate + 'T00:00:00Z');
     console.log('Install date (UTC):', format(installDate, 'yyyy-MM-dd'));
+    
+    // Validate that install date is a business day
+    if (!this.isBusinessDay(installDate)) {
+      console.warn(`WARNING: Install date ${format(installDate, 'yyyy-MM-dd')} is not a business day!`);
+    }
     
     // Calculate all dates working backwards from install date in UTC
     const stainLacquerDate = this.subtractBusinessDays(installDate, 1);
@@ -72,6 +100,16 @@ export class ProjectScheduler {
     };
 
     console.log('Calculated dates:', calculatedDates);
+    
+    // Validate all calculated dates are business days
+    Object.entries(calculatedDates).forEach(([phase, dateString]) => {
+      const date = parseISO(dateString + 'T00:00:00Z');
+      if (!this.isBusinessDay(date)) {
+        console.error(`ERROR: ${phase} date ${dateString} is not a business day!`);
+      }
+    });
+    
+    console.log('=== END PROJECT CALCULATION ===');
 
     return {
       ...project,
