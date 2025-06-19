@@ -1,4 +1,3 @@
-
 import { useState, useRef, useMemo, useEffect, useLayoutEffect } from 'react';
 import { ProjectPhase } from '../types/project';
 import { addMonths, format } from 'date-fns';
@@ -35,6 +34,7 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef<number | null>(null);
+  const hasInitialScrolled = useRef(false);
 
   // Filter phases based on selected filters
   const filteredPhases = useMemo(() => {
@@ -48,8 +48,14 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
     setSelectedPhases(newSelectedPhases);
   };
 
-  // Auto-scroll to current month on initial load
+  // Auto-scroll to current month on initial load only
   useEffect(() => {
+    // Only perform auto-scroll on the very first load, not on subsequent re-renders
+    if (hasInitialScrolled.current) {
+      console.log('Auto-scroll: Skipping - already performed initial scroll');
+      return;
+    }
+
     const currentMonthId = `month-${format(new Date(), 'yyyy-MM')}`;
     const scrollContainer = scrollContainerRef.current;
 
@@ -68,6 +74,8 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
 
           console.log('Auto-scroll: Scrolling to offset:', scrollOffset);
           scrollContainer.scrollTop = scrollOffset;
+          hasInitialScrolled.current = true;
+          console.log('Auto-scroll: Initial scroll completed and marked');
         } else {
           console.log('Auto-scroll: Current month element not found');
         }
@@ -78,9 +86,11 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
   // Preserve scroll position after drag-and-drop operations
   useLayoutEffect(() => {
     if (scrollPositionRef.current !== null && scrollContainerRef.current) {
+      console.log('Scroll restoration: Restoring scroll position to:', scrollPositionRef.current);
       scrollContainerRef.current.scrollTop = scrollPositionRef.current;
       // Reset the ref after restoring the position
       scrollPositionRef.current = null;
+      console.log('Scroll restoration: Position restored and ref cleared');
     }
   }, [phases]); // This effect depends on the `phases` array, so it runs after a re-render
 
@@ -91,6 +101,7 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
     // Save the current scroll position before the drag starts
     if (scrollContainerRef.current) {
       scrollPositionRef.current = scrollContainerRef.current.scrollTop;
+      console.log('Drag start: Saved scroll position:', scrollPositionRef.current);
     }
     
     if (active.data.current?.type === 'project-phase') {
