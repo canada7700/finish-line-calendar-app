@@ -11,9 +11,10 @@ import MonthView from "./MonthView";
 
 interface CalendarViewProps {
   phases: ProjectPhase[];
+  onDragStateChange?: (isDragging: boolean) => void;
 }
 
-export const CalendarView = ({ phases }: CalendarViewProps) => {
+export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) => {
   const [monthsToRender, setMonthsToRender] = useState([new Date()]);
   const [activePhase, setActivePhase] = useState<ProjectPhase | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -92,43 +93,39 @@ export const CalendarView = ({ phases }: CalendarViewProps) => {
 
   // Only scroll to current month on initial load - NEVER after any user interaction
   useEffect(() => {
-    console.log('Scroll to current month effect - conditions:', {
-      isLoadingHolidays,
-      hasCurrentMonthRef: !!currentMonthRef.current,
-      hasCompletedInitialScroll,
-      hasUserNavigated,
-      isDragging,
-      isRescheduling
-    });
-    
     if (!isLoadingHolidays && 
         currentMonthRef.current && 
         !hasCompletedInitialScroll && 
         !hasUserNavigated && 
         !isDragging && 
         !isRescheduling) {
-      console.log('Scrolling to current month');
+      console.log('Scrolling to current month - initial load only');
       currentMonthRef.current.scrollIntoView({ block: 'start' });
       setHasCompletedInitialScroll(true);
     }
   }, [isLoadingHolidays, hasUserNavigated, hasCompletedInitialScroll, isDragging, isRescheduling]);
 
   const handleDragStart = (event: DragStartEvent) => {
-    console.log('Drag start - marking user as navigated');
+    console.log('Drag start - preventing calendar reset');
     const { active } = event;
     if (active.data.current?.type === 'project-phase') {
       setActivePhase(active.data.current.phase);
       setIsDragging(true);
-      // Mark user as having navigated as soon as they start dragging
       setHasUserNavigated(true);
+      
+      // Notify parent component about drag state
+      onDragStateChange?.(true);
     }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
-    console.log('Drag end');
+    console.log('Drag end - maintaining calendar position');
     const { active, over } = event;
     setActivePhase(null);
     setIsDragging(false);
+    
+    // Notify parent component about drag state
+    onDragStateChange?.(false);
 
     if (!over || over.data.current?.type !== 'calendar-day') {
       return;
