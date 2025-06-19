@@ -1,4 +1,3 @@
-
 import { useState, useRef } from 'react';
 import { ProjectPhase } from '../types/project';
 import { addMonths, subMonths } from 'date-fns';
@@ -8,6 +7,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent } from '@dnd-kit/core';
 import MonthView from "./MonthView";
+import { GanttChart } from "./GanttChart";
+import { CalendarViewSelector, CalendarViewType } from "./CalendarViewSelector";
 
 interface CalendarViewProps {
   phases: ProjectPhase[];
@@ -15,6 +16,8 @@ interface CalendarViewProps {
 }
 
 export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) => {
+  const [currentView, setCurrentView] = useState<CalendarViewType>('month');
+  
   // Simple month management - just show 12 months starting from current month
   const [monthsToRender] = useState(() => {
     const months = [];
@@ -110,7 +113,13 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <ScrollArea className="h-full p-4 md:p-6" ref={scrollContainerRef}>
+      <div className="h-full p-4 md:p-6">
+        {/* View selector */}
+        <CalendarViewSelector 
+          currentView={currentView} 
+          onViewChange={setCurrentView} 
+        />
+
         <div className="flex items-start gap-2 p-3 mb-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/30 rounded-md">
           <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5" />
           <div className="text-sm">
@@ -133,18 +142,37 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
           </div>
         )}
         
-        {!isLoadingHolidays ? (
-          monthsToRender.map(month => (
-            <div key={month.toISOString()}>
-              <MonthView monthDate={month} phases={phases} holidays={holidays} />
+        {/* Conditional rendering based on selected view */}
+        {currentView === 'gantt' ? (
+          !isLoadingHolidays ? (
+            <div className="h-[calc(100vh-12rem)]">
+              <GanttChart 
+                phases={phases} 
+                holidays={holidays} 
+                onDragStateChange={onDragStateChange}
+              />
             </div>
-          ))
+          ) : (
+            <div className="flex justify-center items-center h-64">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          )
         ) : (
-          <div className="flex justify-center items-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin" />
-          </div>
+          <ScrollArea className="h-[calc(100vh-12rem)]" ref={scrollContainerRef}>
+            {!isLoadingHolidays ? (
+              monthsToRender.map(month => (
+                <div key={month.toISOString()}>
+                  <MonthView monthDate={month} phases={phases} holidays={holidays} />
+                </div>
+              ))
+            ) : (
+              <div className="flex justify-center items-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            )}
+          </ScrollArea>
         )}
-      </ScrollArea>
+      </div>
 
       <DragOverlay>
         {activePhase && (
