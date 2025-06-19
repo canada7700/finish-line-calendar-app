@@ -1,6 +1,7 @@
+
 import { useMemo, useState } from 'react';
 import { ProjectPhase, ProjectNote, DailyNote } from '../types/project';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, startOfWeek, endOfWeek } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, startOfWeek, endOfWeek, parseISO, isWithinInterval } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertTriangle, MessageSquare, Clock } from 'lucide-react';
 import { Holiday } from '@/hooks/useHolidays';
@@ -67,11 +68,6 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
     return map;
   }, [phaseExceptions]);
 
-  const dailyAllocationsMap = useMemo(() => {
-    const map = new Map<string, any[]>();
-    return map;
-  }, []);
-
   const phasesByProject = useMemo(() => {
     const map = new Map<string, ProjectPhase[]>();
     phases.forEach(phase => {
@@ -106,9 +102,6 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
 
     // Reschedule the project
     rescheduleProject(project, newDate);
-    
-    // Call the optional callback
-    // onProjectDrop?.(phaseId, newDate);
   };
 
   const isNonWorkingDay = (date: Date) => {
@@ -124,9 +117,20 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
   const getPhasesForDate = (date: Date) => {
     const dateString = format(date, 'yyyy-MM-dd');
     return phases.filter(phase => {
-      if (phase.startDate !== dateString || phase.endDate !== dateString) {
+      // Check if this date falls within the phase's date range
+      const phaseStart = parseISO(phase.startDate);
+      const phaseEnd = parseISO(phase.endDate);
+      
+      const isInDateRange = isWithinInterval(date, {
+        start: phaseStart,
+        end: phaseEnd
+      });
+      
+      if (!isInDateRange) {
         return false;
       }
+      
+      // Check for exceptions
       const exceptionKey = `${phase.projectId}-${phase.phase}-${dateString}`;
       return !phaseExceptionsMap.has(exceptionKey);
     });
@@ -243,7 +247,8 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
                           conflictReason={nonWorkingInfo.reason}
                         >
                           <div
-                            className={`text-xs p-1 rounded text-white ${phase.color} truncate ${hasSchedulingConflict ? 'border border-red-300' : ''} relative`}
+                            className={`text-xs p-1 rounded text-white truncate ${hasSchedulingConflict ? 'border border-red-300' : ''} relative`}
+                            style={{ backgroundColor: phase.color }}
                             title={`${phase.projectName} - ${phase.phase.toUpperCase()} (${phase.hours}h)${hasSchedulingConflict ? ' - CONFLICT: Scheduled on ' + nonWorkingInfo.reason : ''}`}
                           >
                             {phase.projectName}

@@ -65,28 +65,48 @@ export const getProjectPhases = async (projects: Project[]): Promise<ProjectPhas
   const phases: ProjectPhase[] = [];
 
   projects.forEach((project) => {
-    const addPhase = (phase: 'materialOrder' | 'millwork' | 'boxConstruction' | 'stain' | 'install', date: string | null | undefined, duration: number, phaseHrs: number) => {
-      if (date) {
+    const addPhase = (
+      phase: 'materialOrder' | 'millwork' | 'boxConstruction' | 'stain' | 'install', 
+      dateString: string | null | undefined, 
+      phaseHrs: number
+    ) => {
+      if (dateString) {
+        console.log(`Adding phase ${phase} for project ${project.jobName} on date ${dateString} with ${phaseHrs} hours`);
+        
+        // Calculate end date - for single day phases, start and end are the same
+        let endDate = dateString;
+        if (phaseHrs > 8) {
+          // Multi-day phase
+          const startDate = parseISO(dateString);
+          const durationDays = Math.max(1, Math.ceil(phaseHrs / 8));
+          const calculatedEndDate = ProjectScheduler.addBusinessDays(startDate, durationDays - 1);
+          endDate = format(calculatedEndDate, 'yyyy-MM-dd');
+        }
+        
         phases.push({
           id: `${project.id}-${phase}`,
           projectId: project.id,
           projectName: project.jobName,
           phase: phase,
-          startDate: date,
-          endDate: ProjectScheduler.addBusinessDays(parseISO(date), Math.max(1, Math.ceil(phaseHrs / 8))).toISOString().split('T')[0],
+          startDate: dateString,
+          endDate: endDate,
           hours: phaseHrs,
           color: getPhaseColor(phase),
         });
+      } else {
+        console.log(`Skipping phase ${phase} for project ${project.jobName} - no date provided`);
       }
     };
 
-    addPhase('materialOrder', project.materialOrderDate, 1, 0);
-    addPhase('millwork', project.millworkStartDate, project.millworkHrs / 8, project.millworkHrs);
-    addPhase('boxConstruction', project.boxConstructionStartDate, project.boxConstructionHrs / 8, project.boxConstructionHrs);
-    addPhase('stain', project.stainStartDate, project.stainHrs / 8, project.stainHrs);
-    addPhase('install', project.installDate, project.installHrs / 8, project.installHrs);
+    // Add phases with proper hours
+    addPhase('materialOrder', project.materialOrderDate, 0);
+    addPhase('millwork', project.millworkStartDate, project.millworkHrs);
+    addPhase('boxConstruction', project.boxConstructionStartDate, project.boxConstructionHrs);
+    addPhase('stain', project.stainStartDate, project.stainHrs);
+    addPhase('install', project.installDate, project.installHrs);
   });
 
+  console.log(`Generated ${phases.length} phases from ${projects.length} projects`);
   return phases;
 };
 
