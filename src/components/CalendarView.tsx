@@ -1,7 +1,7 @@
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useRef } from 'react';
 import { ProjectPhase } from '../types/project';
-import { addMonths, subMonths, isSameMonth, format } from 'date-fns';
+import { addMonths, subMonths } from 'date-fns';
 import { useHolidays } from '@/hooks/useHolidays';
 import { useProjectRescheduling } from '@/hooks/useProjectRescheduling';
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -14,189 +14,62 @@ interface CalendarViewProps {
   onDragStateChange?: (isDragging: boolean) => void;
 }
 
-const MONTHS_STATE_KEY = 'calendar-months-state';
-const CURRENT_MONTH_KEY = 'calendar-current-month';
-
 export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) => {
-  // Initialize monthsToRender from localStorage or default to current month
-  const [monthsToRender, setMonthsToRender] = useState(() => {
-    try {
-      const saved = localStorage.getItem(MONTHS_STATE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return parsed.map((dateStr: string) => new Date(dateStr));
-      }
-    } catch (e) {
-      console.log('Could not restore months state:', e);
+  // Simple month management - just show 12 months starting from current month
+  const [monthsToRender] = useState(() => {
+    const months = [];
+    const currentMonth = new Date();
+    // Show 6 months before and 18 months after current month
+    for (let i = -6; i <= 18; i++) {
+      months.push(addMonths(currentMonth, i));
     }
-    return [new Date()];
-  });
-
-  // Track the current month the user is viewing
-  const [currentViewMonth, setCurrentViewMonth] = useState(() => {
-    try {
-      const saved = localStorage.getItem(CURRENT_MONTH_KEY);
-      if (saved) {
-        return new Date(saved);
-      }
-    } catch (e) {
-      console.log('Could not restore current month:', e);
-    }
-    return new Date();
+    return months;
   });
 
   const [activePhase, setActivePhase] = useState<ProjectPhase | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [hasCompletedInitialScroll, setHasCompletedInitialScroll] = useState(() => {
-    return sessionStorage.getItem('calendar-initial-scroll-done') === 'true';
-  });
+  const [savedScrollPosition, setSavedScrollPosition] = useState<number | null>(null);
   
   const { holidays, isLoading: isLoadingHolidays } = useHolidays();
   const { rescheduleProject, isRescheduling } = useProjectRescheduling();
 
-  const observer = useRef<IntersectionObserver>();
-  const topSentinelRef = useRef<HTMLDivElement>(null);
-  const bottomSentinelRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const monthRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-
-  // Save monthsToRender to localStorage whenever it changes
-  useEffect(() => {
-    try {
-      localStorage.setItem(MONTHS_STATE_KEY, JSON.stringify(monthsToRender.map(m => m.toISOString())));
-    } catch (e) {
-      console.log('Could not save months state:', e);
-    }
-  }, [monthsToRender]);
-
-  // Save current view month to localStorage whenever it changes
-  useEffect(() => {
-    try {
-      localStorage.setItem(CURRENT_MONTH_KEY, currentViewMonth.toISOString());
-    } catch (e) {
-      console.log('Could not save current month:', e);
-    }
-  }, [currentViewMonth]);
-
-  const loadPrevious = useCallback(() => {
-    console.log('Loading previous month');
-    setMonthsToRender(prev => [subMonths(prev[0], 1), ...prev]);
-  }, []);
-
-  const loadNext = useCallback(() => {
-    console.log('Loading next month');
-    setMonthsToRender(prev => [...prev, addMonths(prev[prev.length - 1], 1)]);
-  }, []);
-
-  // Intersection observer to track which months are visible and detect current view month
-  useEffect(() => {
-    const monthObserver = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
-          // Find which month this element represents
-          const monthKey = entry.target.getAttribute('data-month');
-          if (monthKey) {
-            const month = new Date(monthKey);
-            console.log('Month in view:', format(month, 'MMMM yyyy'));
-            setCurrentViewMonth(month);
-          }
-        }
-      });
-    }, { threshold: [0.5] });
-
-    // Observe all month elements
-    monthRefs.current.forEach((element) => {
-      monthObserver.observe(element);
-    });
-
-    return () => monthObserver.disconnect();
-  }, [monthsToRender]);
-
-  // Scroll to specific month
-  const scrollToMonth = useCallback((targetMonth: Date) => {
-    const monthKey = targetMonth.toISOString();
-    const monthElement = monthRefs.current.get(monthKey);
-    
-    if (monthElement && scrollContainerRef.current) {
-      console.log('Scrolling to month:', format(targetMonth, 'MMMM yyyy'));
-      monthElement.scrollIntoView({ block: 'start', behavior: 'smooth' });
-    }
-  }, []);
-
-  // Restore view to current month after phases update (but not during drag or initial load)
-  useEffect(() => {
-    if (!isDragging && !isRescheduling && hasCompletedInitialScroll) {
-      console.log('Restoring view to current month after phases update');
-      // Small delay to ensure DOM has updated
-      setTimeout(() => {
-        scrollToMonth(currentViewMonth);
-      }, 100);
-    }
-  }, [phases, isDragging, isRescheduling, hasCompletedInitialScroll, currentViewMonth, scrollToMonth]);
-
-  useEffect(() => {
-    const currentObserver = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting && !isDragging && !isRescheduling) {
-          if (entry.target === topSentinelRef.current) {
-            loadPrevious();
-          } else if (entry.target === bottomSentinelRef.current) {
-            loadNext();
-          }
-        }
-      });
-    });
-    observer.current = currentObserver;
-
-    if (topSentinelRef.current) currentObserver.observe(topSentinelRef.current);
-    if (bottomSentinelRef.current) currentObserver.observe(bottomSentinelRef.current);
-
-    return () => currentObserver.disconnect();
-  }, [loadPrevious, loadNext, isDragging, isRescheduling]);
-
-  // Only scroll to current month on VERY FIRST load - never again
-  useEffect(() => {
-    if (!isLoadingHolidays && !hasCompletedInitialScroll && !isDragging && !isRescheduling) {
-      console.log('Performing INITIAL scroll to current month - this should only happen once per session');
-      
-      const currentMonth = new Date();
-      // Check if current month is in our monthsToRender, if not add it
-      const hasCurrentMonth = monthsToRender.some(month => isSameMonth(month, currentMonth));
-      
-      if (!hasCurrentMonth) {
-        console.log('Adding current month to rendered months');
-        setMonthsToRender(prev => [...prev, currentMonth].sort((a, b) => a.getTime() - b.getTime()));
-      }
-      
-      setTimeout(() => {
-        scrollToMonth(currentMonth);
-        setCurrentViewMonth(currentMonth);
-        setHasCompletedInitialScroll(true);
-        sessionStorage.setItem('calendar-initial-scroll-done', 'true');
-      }, 200);
-    }
-  }, [isLoadingHolidays, hasCompletedInitialScroll, isDragging, isRescheduling, monthsToRender, scrollToMonth]);
 
   const handleDragStart = (event: DragStartEvent) => {
-    console.log('Drag start - preventing calendar reset');
+    console.log('Drag start - saving scroll position');
     const { active } = event;
+    
+    // Save current scroll position
+    if (scrollContainerRef.current) {
+      setSavedScrollPosition(scrollContainerRef.current.scrollTop);
+      console.log('Saved scroll position:', scrollContainerRef.current.scrollTop);
+    }
+    
     if (active.data.current?.type === 'project-phase') {
       setActivePhase(active.data.current.phase);
       setIsDragging(true);
-      
-      // Notify parent component about drag state
       onDragStateChange?.(true);
     }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
-    console.log('Drag end - maintaining calendar position');
+    console.log('Drag end - restoring scroll position');
     const { active, over } = event;
+    
     setActivePhase(null);
     setIsDragging(false);
-    
-    // Notify parent component about drag state
     onDragStateChange?.(false);
+
+    // Restore scroll position after a brief delay to allow for any updates
+    if (savedScrollPosition !== null && scrollContainerRef.current) {
+      setTimeout(() => {
+        if (scrollContainerRef.current) {
+          console.log('Restoring scroll position to:', savedScrollPosition);
+          scrollContainerRef.current.scrollTop = savedScrollPosition;
+        }
+        setSavedScrollPosition(null);
+      }, 100);
+    }
 
     if (!over || over.data.current?.type !== 'calendar-day') {
       return;
@@ -260,34 +133,17 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
           </div>
         )}
         
-        <div ref={topSentinelRef} className="h-1" />
-        
         {!isLoadingHolidays ? (
-          monthsToRender.map(month => {
-            const monthKey = month.toISOString();
-            return (
-              <div 
-                key={monthKey} 
-                ref={(el) => {
-                  if (el) {
-                    monthRefs.current.set(monthKey, el);
-                  } else {
-                    monthRefs.current.delete(monthKey);
-                  }
-                }}
-                data-month={monthKey}
-              >
-                <MonthView monthDate={month} phases={phases} holidays={holidays} />
-              </div>
-            );
-          })
+          monthsToRender.map(month => (
+            <div key={month.toISOString()}>
+              <MonthView monthDate={month} phases={phases} holidays={holidays} />
+            </div>
+          ))
         ) : (
           <div className="flex justify-center items-center h-64">
             <Loader2 className="h-8 w-8 animate-spin" />
           </div>
         )}
-
-        <div ref={bottomSentinelRef} className="h-1"/>
       </ScrollArea>
 
       <DragOverlay>

@@ -12,14 +12,11 @@ const CalendarPage = () => {
   const [isLoadingPhases, setIsLoadingPhases] = useState(true);
   const [isDragInProgress, setIsDragInProgress] = useState(false);
   
-  // Use ref to track the latest phases to avoid stale closures
   const phasesRef = useRef<ProjectPhase[]>([]);
   const debounceTimeoutRef = useRef<NodeJS.Timeout>();
 
-  // Memoize projects to prevent unnecessary phase recalculations
   const memoizedProjects = useMemo(() => projects, [projects]);
 
-  // Improved phase comparison function
   const phasesAreEqual = useCallback((oldPhases: ProjectPhase[], newPhases: ProjectPhase[]) => {
     if (oldPhases.length !== newPhases.length) return false;
     
@@ -37,7 +34,6 @@ const CalendarPage = () => {
     return true;
   }, []);
 
-  // Debounced phase update function
   const updatePhasesDebounced = useCallback((newProjects: typeof projects) => {
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
@@ -50,7 +46,6 @@ const CalendarPage = () => {
         try {
           const newPhases = await getProjectPhases(newProjects);
           
-          // Only update if phases actually changed
           if (!phasesAreEqual(phasesRef.current, newPhases)) {
             console.log('Phases changed, updating state');
             setPhases(newPhases);
@@ -66,11 +61,11 @@ const CalendarPage = () => {
         phasesRef.current = [];
         setIsLoadingPhases(false);
       }
-    }, isDragInProgress ? 1000 : 100); // Longer delay during drag operations
+    }, isDragInProgress ? 2000 : 300); // Much longer delay during drag
   }, [phasesAreEqual, isLoadingProjects, isDragInProgress]);
 
   useEffect(() => {
-    // Skip phase recalculation if drag is in progress
+    // Skip phase recalculation completely if drag is in progress
     if (isDragInProgress) {
       console.log('Skipping phase update - drag in progress');
       return;
@@ -85,7 +80,6 @@ const CalendarPage = () => {
     };
   }, [memoizedProjects, updatePhasesDebounced, isDragInProgress]);
 
-  // Handle drag state changes from CalendarView
   const handleDragStateChange = useCallback((dragging: boolean) => {
     console.log('Drag state changed:', dragging);
     setIsDragInProgress(dragging);
