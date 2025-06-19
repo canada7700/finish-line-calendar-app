@@ -1,3 +1,4 @@
+
 import * as React from 'react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -20,12 +21,12 @@ import HourAllocationGrid from './HourAllocationGrid';
 interface HourAllocationDialogProps {
   date: Date;
   phases: ProjectPhase[];
-  selectedPhase?: ProjectPhase | null;
+  initialProjectPhase?: ProjectPhase | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-const HourAllocationDialog = ({ date, phases, selectedPhase, open, onOpenChange }: HourAllocationDialogProps) => {
+const HourAllocationDialog = ({ date, phases, initialProjectPhase, open, onOpenChange }: HourAllocationDialogProps) => {
   const [selectedProject, setSelectedProject] = React.useState<string>('');
   const [selectedPhase, setSelectedPhase] = React.useState<string>('');
   const [selectedTeamMembers, setSelectedTeamMembers] = React.useState<string[]>([]);
@@ -47,9 +48,9 @@ const HourAllocationDialog = ({ date, phases, selectedPhase, open, onOpenChange 
 
   // Set initial values when dialog opens with selected phase context
   React.useEffect(() => {
-    if (open && selectedPhase) {
-      setSelectedProject(selectedPhase.projectId);
-      setSelectedPhase(selectedPhase.phase);
+    if (open && initialProjectPhase) {
+      setSelectedProject(initialProjectPhase.projectId);
+      setSelectedPhase(initialProjectPhase.phase);
     } else if (!open) {
       // Reset form when dialog closes
       setSelectedProject('');
@@ -57,7 +58,7 @@ const HourAllocationDialog = ({ date, phases, selectedPhase, open, onOpenChange 
       setSelectedTeamMembers([]);
       setSelectedHourBlocks([]);
     }
-  }, [open, selectedPhase]);
+  }, [open, initialProjectPhase]);
 
   React.useEffect(() => {
     if (open) {
@@ -396,9 +397,9 @@ const HourAllocationDialog = ({ date, phases, selectedPhase, open, onOpenChange 
           </DialogTitle>
           <DialogDescription>
             Assign team members to specific hour blocks for different project phases. Work day is 8 AM to 5 PM. Team members cannot be double-booked.
-            {selectedPhase && (
+            {initialProjectPhase && (
               <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-sm">
-                <strong>Selected:</strong> {selectedPhase.projectName} - {selectedPhase.phase.toUpperCase()}
+                <strong>Selected:</strong> {initialProjectPhase.projectName} - {initialProjectPhase.phase.toUpperCase()}
               </div>
             )}
           </DialogDescription>
