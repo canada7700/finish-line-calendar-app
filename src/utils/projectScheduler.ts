@@ -271,13 +271,13 @@ export class ProjectScheduler {
     const stainEndDate = this.getPreviousWorkingDay(installStartDate);
     const stainStartDate = this.subtractBusinessDays(stainEndDate, stainDuration - 1);
     
-    // Millwork must complete before stain (1 business day buffer)
-    const millworkEndDate = this.getPreviousWorkingDay(stainStartDate);
-    const millworkStartDate = this.subtractBusinessDays(millworkEndDate, millworkDuration - 1);
-    
-    // Box construction must complete before install (3 business day buffer)
-    const boxConstructionEndDate = this.subtractBusinessDays(installStartDate, 3);
+    // Box construction must complete before stain (1 business day buffer)
+    const boxConstructionEndDate = this.getPreviousWorkingDay(stainStartDate);
     const boxConstructionStartDate = this.subtractBusinessDays(boxConstructionEndDate, boxConstructionDuration - 1);
+    
+    // Millwork must complete before box construction (1 business day buffer)
+    const millworkEndDate = this.getPreviousWorkingDay(boxConstructionStartDate);
+    const millworkStartDate = this.subtractBusinessDays(millworkEndDate, millworkDuration - 1);
 
     // Material order date is 60 calendar days before install start
     let materialOrderDate = subDays(installStartDate, 60);
@@ -368,13 +368,13 @@ export class ProjectScheduler {
     const stainEndDate = this.getPreviousWorkingDay(finalInstallDate);
     const stainStartDate = this.subtractBusinessDays(stainEndDate, stainDuration - 1);
     
-    // Millwork must complete before stain (1 business day buffer)
-    const millworkEndDate = this.getPreviousWorkingDay(stainStartDate);
-    const millworkStartDate = this.subtractBusinessDays(millworkEndDate, millworkDuration - 1);
-    
-    // Box construction must complete before install (3 business day buffer)
-    const boxConstructionEndDate = this.subtractBusinessDays(finalInstallDate, 3);
+    // Box construction must complete before stain (1 business day buffer)
+    const boxConstructionEndDate = this.getPreviousWorkingDay(stainStartDate);
     const boxConstructionStartDate = this.subtractBusinessDays(boxConstructionEndDate, boxConstructionDuration - 1);
+    
+    // Millwork must complete before box construction (1 business day buffer)
+    const millworkEndDate = this.getPreviousWorkingDay(boxConstructionStartDate);
+    const millworkStartDate = this.subtractBusinessDays(millworkEndDate, millworkDuration - 1);
 
     const calculatedDates = {
       millworkStart: format(millworkStartDate, 'yyyy-MM-dd'),
