@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useProjects } from '@/hooks/useProjects';
 import { getProjectPhases } from '@/utils/projectScheduler';
 import { CalendarView } from '@/components/CalendarView';
@@ -11,17 +11,26 @@ const CalendarPage = () => {
   const [phases, setPhases] = useState<ProjectPhase[]>([]);
   const [isLoadingPhases, setIsLoadingPhases] = useState(true);
 
+  // Memoize projects to prevent unnecessary phase recalculations
+  const memoizedProjects = useMemo(() => projects, [projects]);
+
   useEffect(() => {
-    if (projects && projects.length > 0) {
+    if (memoizedProjects && memoizedProjects.length > 0) {
       setIsLoadingPhases(true);
-      getProjectPhases(projects)
-        .then(setPhases)
+      getProjectPhases(memoizedProjects)
+        .then((newPhases) => {
+          // Only update phases if they're actually different to prevent unnecessary re-renders
+          setPhases(prevPhases => {
+            const phasesChanged = JSON.stringify(prevPhases) !== JSON.stringify(newPhases);
+            return phasesChanged ? newPhases : prevPhases;
+          });
+        })
         .finally(() => setIsLoadingPhases(false));
     } else if (!isLoadingProjects) {
         setPhases([]);
         setIsLoadingPhases(false);
     }
-  }, [projects, isLoadingProjects]);
+  }, [memoizedProjects, isLoadingProjects]);
 
   const isLoading = isLoadingProjects || isLoadingPhases;
 

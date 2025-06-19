@@ -2,7 +2,8 @@
 import React from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { ProjectPhase } from '@/types/project';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Loader2 } from 'lucide-react';
+import { useProjectRescheduling } from '@/hooks/useProjectRescheduling';
 
 interface DraggableProjectPhaseProps {
   phase: ProjectPhase;
@@ -17,6 +18,8 @@ const DraggableProjectPhase = ({
   conflictReason,
   children 
 }: DraggableProjectPhaseProps) => {
+  const { isRescheduling } = useProjectRescheduling();
+  
   const {
     attributes,
     listeners,
@@ -28,7 +31,8 @@ const DraggableProjectPhase = ({
     data: {
       phase,
       type: 'project-phase'
-    }
+    },
+    disabled: isRescheduling
   });
 
   const style = transform ? {
@@ -50,15 +54,23 @@ const DraggableProjectPhase = ({
       {...attributes}
       className={`
         ${isDragging ? 'opacity-50 z-50' : ''} 
-        ${isDraggablePhase ? 'cursor-grab active:cursor-grabbing' : ''}
-        transition-opacity duration-200
+        ${isDraggablePhase && !isRescheduling ? 'cursor-grab active:cursor-grabbing' : ''}
+        ${isRescheduling ? 'cursor-not-allowed opacity-75' : ''}
+        transition-opacity duration-200 relative
       `}
-      title={`Drag to reschedule ${phase.projectName}${hasSchedulingConflict ? ` - CONFLICT: ${conflictReason}` : ''}`}
+      title={`${isRescheduling ? 'Updating project...' : `Drag to reschedule ${phase.projectName}`}${hasSchedulingConflict ? ` - CONFLICT: ${conflictReason}` : ''}`}
     >
       {children}
       {isDraggablePhase && (
-        <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full opacity-75" 
-             title="Drag handle - drag to reschedule project" />
+        <div className="absolute -top-1 -right-1 flex items-center gap-1">
+          {isRescheduling ? (
+            <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" 
+                 title="Updating project..." />
+          ) : (
+            <div className="w-2 h-2 bg-blue-500 rounded-full opacity-75" 
+                 title="Drag handle - drag to reschedule project" />
+          )}
+        </div>
       )}
     </div>
   );

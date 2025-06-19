@@ -1,7 +1,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ProjectScheduler } from '@/utils/projectScheduler';
-import { Project } from '@/types/project';
+import { Project, ProjectPhase } from '@/types/project';
 import { useProjects } from '@/hooks/useProjects';
 import { toast } from '@/hooks/use-toast';
 import { format, addDays, differenceInDays } from 'date-fns';
@@ -32,12 +32,47 @@ export const useProjectRescheduling = () => {
       console.log('Recalculated project dates:', recalculatedProject);
       return recalculatedProject;
     },
-    onSuccess: (recalculatedProject) => {
+    onMutate: async ({ project, newInstallDate }) => {
+      // Cancel any outgoing refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: ['projects'] });
+
+      // Snapshot the previous value
+      const previousProjects = queryClient.getQueryData(['projects']);
+
+      // Optimistically update the project in the cache
+      queryClient.setQueryData(['projects'], (old: Project[] | undefined) => {
+        if (!old) return old;
+        
+        return old.map(p => {
+          if (p.id === project.id) {
+            return {
+              ...p,
+              installDate: format(newInstallDate, 'yyyy-MM-dd')
+            };
+          }
+          return p;
+        });
+      });
+
+      // Return a context object with the snapshotted value
+      return { previousProjects };
+    },
+    onSuccess: (recalculatedProject, variables, context) => {
       // Update the project in the database
       updateProject(recalculatedProject, {
         onSuccess: () => {
-          // Invalidate queries to refresh the calendar
-          queryClient.invalidateQueries({ queryKey: ['projects'] });
+          // Update the cache with the fully recalculated project
+          queryClient.setQueryData(['projects'], (old: Project[] | undefined) => {
+            if (!old) return old;
+            
+            return old.map(p => {
+              if (p.id === recalculatedProject.id) {
+                return recalculatedProject;
+              }
+              return p;
+            });
+          });
+          
           toast({
             title: "Project Rescheduled",
             description: `${recalculatedProject.jobName} has been rescheduled successfully.`,
@@ -45,6 +80,12 @@ export const useProjectRescheduling = () => {
         },
         onError: (error) => {
           console.error('Failed to update project:', error);
+          
+          // Rollback the optimistic update
+          if (context?.previousProjects) {
+            queryClient.setQueryData(['projects'], context.previousProjects);
+          }
+          
           toast({
             title: "Error",
             description: "Failed to reschedule project. Please try again.",
@@ -53,8 +94,14 @@ export const useProjectRescheduling = () => {
         }
       });
     },
-    onError: (error) => {
+    onError: (error, variables, context) => {
       console.error('Failed to reschedule project:', error);
+      
+      // Rollback the optimistic update
+      if (context?.previousProjects) {
+        queryClient.setQueryData(['projects'], context.previousProjects);
+      }
+      
       toast({
         title: "Error",
         description: "Failed to calculate new project dates. Please try again.",

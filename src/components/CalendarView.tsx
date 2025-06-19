@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ProjectPhase } from '../types/project';
 import { addMonths, subMonths, isSameMonth, format } from 'date-fns';
@@ -15,8 +16,9 @@ interface CalendarViewProps {
 export const CalendarView = ({ phases }: CalendarViewProps) => {
   const [monthsToRender, setMonthsToRender] = useState([new Date()]);
   const [activePhase, setActivePhase] = useState<ProjectPhase | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const { holidays, isLoading: isLoadingHolidays } = useHolidays();
-  const { rescheduleProject } = useProjectRescheduling();
+  const { rescheduleProject, isRescheduling } = useProjectRescheduling();
 
   const observer = useRef<IntersectionObserver>();
   const topSentinelRef = useRef<HTMLDivElement>(null);
@@ -25,6 +27,7 @@ export const CalendarView = ({ phases }: CalendarViewProps) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const currentMonthRef = useRef<HTMLDivElement>(null);
   const hasScrolledToCurrentMonth = useRef(false);
+  const scrollPosition = useRef<number>(0);
 
   const loadPrevious = useCallback(() => {
     setMonthsToRender(prev => [subMonths(prev[0], 1), ...prev]);
@@ -34,10 +37,36 @@ export const CalendarView = ({ phases }: CalendarViewProps) => {
     setMonthsToRender(prev => [...prev, addMonths(prev[prev.length - 1], 1)]);
   }, []);
 
+  // Save scroll position before updates
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current;
+    if (scrollContainer && !isDragging) {
+      const handleScroll = () => {
+        scrollPosition.current = scrollContainer.scrollTop;
+      };
+      
+      scrollContainer.addEventListener('scroll', handleScroll);
+      return () => scrollContainer.removeEventListener('scroll', handleScroll);
+    }
+  }, [isDragging]);
+
+  // Restore scroll position after updates (but not during initial load)
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current;
+    if (scrollContainer && hasScrolledToCurrentMonth.current && !isDragging && !isRescheduling) {
+      // Small delay to ensure DOM has updated
+      const timeoutId = setTimeout(() => {
+        scrollContainer.scrollTop = scrollPosition.current;
+      }, 50);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [phases, isDragging, isRescheduling]);
+
   useEffect(() => {
     const currentObserver = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
-        if (entry.isIntersecting) {
+        if (entry.isIntersecting && !isDragging) {
           if (entry.target === topSentinelRef.current) {
             loadPrevious();
           } else if (entry.target === bottomSentinelRef.current) {
@@ -52,7 +81,7 @@ export const CalendarView = ({ phases }: CalendarViewProps) => {
     if (bottomSentinelRef.current) currentObserver.observe(bottomSentinelRef.current);
 
     return () => currentObserver.disconnect();
-  }, [loadPrevious, loadNext]);
+  }, [loadPrevious, loadNext, isDragging]);
 
   useEffect(() => {
     if (!isLoadingHolidays && currentMonthRef.current && !hasScrolledToCurrentMonth.current) {
@@ -65,12 +94,14 @@ export const CalendarView = ({ phases }: CalendarViewProps) => {
     const { active } = event;
     if (active.data.current?.type === 'project-phase') {
       setActivePhase(active.data.current.phase);
+      setIsDragging(true);
     }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActivePhase(null);
+    setIsDragging(false);
 
     if (!over || over.data.current?.type !== 'calendar-day') {
       return;
@@ -124,6 +155,15 @@ export const CalendarView = ({ phases }: CalendarViewProps) => {
             </div>
           </div>
         </div>
+
+        {isRescheduling && (
+          <div className="flex items-center justify-center gap-2 p-3 mb-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/30 rounded-md">
+            <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+            <div className="text-sm text-blue-800 dark:text-blue-200">
+              Rescheduling project...
+            </div>
+          </div>
+        )}
         
         <div ref={topSentinelRef} className="h-1" />
         
@@ -147,9 +187,15 @@ export const CalendarView = ({ phases }: CalendarViewProps) => {
 
       <DragOverlay>
         {activePhase && (
-          <div className="bg-white dark:bg-gray-800 p-2 rounded shadow-lg border border-gray-200 dark:border-gray-700 max-w-48">
+          <div className="bg-white dark:bg-gray-800 p-2 rounded shadow-lg border border-gray-200 dark:border-gray-700 max-w-48 opacity-90">
             <div className="text-sm font-medium">{activePhase.projectName}</div>
             <div className="text-xs text-gray-500">Moving entire project timeline</div>
+            {isRescheduling && (
+              <div className="flex items-center gap-1 mt-1">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                <span className="text-xs text-gray-600">Updating...</span>
+              </div>
+            )}
           </div>
         )}
       </DragOverlay>
