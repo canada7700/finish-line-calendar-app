@@ -1,15 +1,15 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ProjectScheduler } from '@/utils/projectScheduler';
-import { Project, ProjectPhase } from '@/types/project';
+import { mapProjectToDatabase } from '@/utils/databaseMapping';
+import { dateInputToUTC } from '@/utils/timezoneUtils';
+import { Project } from '@/types/project';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { format, addDays, differenceInDays } from 'date-fns';
-import { useRef } from 'react';
+import { differenceInDays, parseISO } from 'date-fns';
 
-export const useProjectRescheduling = (isDragInProgress: boolean = false) => {
+export const useProjectRescheduling = () => {
   const queryClient = useQueryClient();
-  const pendingUpdatesRef = useRef<{ project: Project; originalData: any } | null>(null);
 
   const rescheduleProjectMutation = useMutation({
     mutationFn: async ({ 
@@ -19,12 +19,12 @@ export const useProjectRescheduling = (isDragInProgress: boolean = false) => {
       project: Project; 
       newInstallDate: Date; 
     }) => {
-      console.log('Rescheduling project:', project.jobName, 'to new install date:', format(newInstallDate, 'yyyy-MM-dd'));
+      console.log('Rescheduling project:', project.jobName, 'to new install date:', newInstallDate);
       
-      // Create updated project with new install date
+      // Convert the new install date to UTC string for calculations
       const updatedProject = {
         ...project,
-        installDate: format(newInstallDate, 'yyyy-MM-dd')
+        installDate: dateInputToUTC(newInstallDate)
       };
 
       // Recalculate all project dates based on new install date
@@ -32,19 +32,13 @@ export const useProjectRescheduling = (isDragInProgress: boolean = false) => {
       
       console.log('Recalculated project dates:', recalculatedProject);
 
-      // Update the project directly in Supabase without going through useProjects
+      // Use dynamic mapping to convert camelCase to snake_case
+      const dbFields = mapProjectToDatabase(recalculatedProject);
+
+      // Update the project in Supabase using dynamic field mapping
       const { error } = await supabase
         .from('projects')
-        .update({
-          install_date: recalculatedProject.installDate,
-          material_order_date: recalculatedProject.materialOrderDate,
-          box_toekick_assembly_date: recalculatedProject.boxToekickAssemblyDate,
-          milling_fillers_date: recalculatedProject.millingFillersDate,
-          stain_lacquer_date: recalculatedProject.stainLacquerDate,
-          millwork_start_date: recalculatedProject.millworkStartDate,
-          box_construction_start_date: recalculatedProject.boxConstructionStartDate,
-          stain_start_date: recalculatedProject.stainStartDate
-        })
+        .update(dbFields)
         .eq('id', recalculatedProject.id);
 
       if (error) {
@@ -55,68 +49,52 @@ export const useProjectRescheduling = (isDragInProgress: boolean = false) => {
       return recalculatedProject;
     },
     onMutate: async ({ project, newInstallDate }) => {
-      // Cancel any outgoing refetches so they don't overwrite our optimistic update
+      // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: ['projects'] });
 
       // Snapshot the previous value
       const previousProjects = queryClient.getQueryData(['projects']);
 
-      // Only update cache if NOT dragging
-      if (!isDragInProgress) {
-        // Optimistically update the project in the cache
-        queryClient.setQueryData(['projects'], (old: Project[] | undefined) => {
-          if (!old) return old;
-          
-          return old.map(p => {
-            if (p.id === project.id) {
-              return {
-                ...p,
-                installDate: format(newInstallDate, 'yyyy-MM-dd')
-              };
-            }
-            return p;
-          });
+      // Optimistically update the project in the cache
+      queryClient.setQueryData(['projects'], (old: Project[] | undefined) => {
+        if (!old) return old;
+        
+        return old.map(p => {
+          if (p.id === project.id) {
+            return {
+              ...p,
+              installDate: dateInputToUTC(newInstallDate)
+            };
+          }
+          return p;
         });
-      } else {
-        console.log('Skipping optimistic update - drag in progress');
-      }
+      });
 
-      // Return a context object with the snapshotted value
       return { previousProjects };
     },
-    onSuccess: (recalculatedProject, variables, context) => {
-      // Only update cache if NOT dragging
-      if (!isDragInProgress) {
-        // Update the cache with the fully recalculated project
-        queryClient.setQueryData(['projects'], (old: Project[] | undefined) => {
-          if (!old) return old;
-          
-          return old.map(p => {
-            if (p.id === recalculatedProject.id) {
-              return recalculatedProject;
-            }
-            return p;
-          });
-        });
+    onSuccess: (recalculatedProject) => {
+      // Update the cache with the fully recalculated project
+      queryClient.setQueryData(['projects'], (old: Project[] | undefined) => {
+        if (!old) return old;
         
-        toast({
-          title: "Project Rescheduled",
-          description: `${recalculatedProject.jobName} has been rescheduled successfully.`,
+        return old.map(p => {
+          if (p.id === recalculatedProject.id) {
+            return recalculatedProject;
+          }
+          return p;
         });
-      } else {
-        // Store the update to apply later
-        console.log('Storing pending update - drag in progress');
-        pendingUpdatesRef.current = { 
-          project: recalculatedProject, 
-          originalData: context?.previousProjects 
-        };
-      }
+      });
+      
+      toast({
+        title: "Project Rescheduled",
+        description: `${recalculatedProject.jobName} has been rescheduled successfully.`,
+      });
     },
     onError: (error, variables, context) => {
       console.error('Failed to reschedule project:', error);
       
-      // Rollback the optimistic update only if we actually made one
-      if (!isDragInProgress && context?.previousProjects) {
+      // Rollback the optimistic update
+      if (context?.previousProjects) {
         queryClient.setQueryData(['projects'], context.previousProjects);
       }
       
@@ -128,33 +106,8 @@ export const useProjectRescheduling = (isDragInProgress: boolean = false) => {
     }
   });
 
-  const applyPendingUpdates = () => {
-    if (pendingUpdatesRef.current) {
-      console.log('Applying pending cache update after drag completion');
-      const { project } = pendingUpdatesRef.current;
-      
-      queryClient.setQueryData(['projects'], (old: Project[] | undefined) => {
-        if (!old) return old;
-        
-        return old.map(p => {
-          if (p.id === project.id) {
-            return project;
-          }
-          return p;
-        });
-      });
-      
-      toast({
-        title: "Project Rescheduled",
-        description: `${project.jobName} has been rescheduled successfully.`,
-      });
-      
-      pendingUpdatesRef.current = null;
-    }
-  };
-
   const rescheduleProject = (project: Project, newInstallDate: Date) => {
-    const currentInstallDate = new Date(`${project.installDate}T00:00:00`);
+    const currentInstallDate = parseISO(project.installDate);
     const daysDifference = Math.abs(differenceInDays(newInstallDate, currentInstallDate));
     
     // Show confirmation for large date changes (more than 7 days)
@@ -171,6 +124,5 @@ export const useProjectRescheduling = (isDragInProgress: boolean = false) => {
   return {
     rescheduleProject,
     isRescheduling: rescheduleProjectMutation.isPending,
-    applyPendingUpdates,
   };
 };

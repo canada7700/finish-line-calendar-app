@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useProjects } from '@/hooks/useProjects';
 import { getProjectPhases } from '@/utils/projectScheduler';
 import { CalendarView } from '@/components/CalendarView';
@@ -10,89 +10,31 @@ const CalendarPage = () => {
   const { projects, isLoading: isLoadingProjects } = useProjects();
   const [phases, setPhases] = useState<ProjectPhase[]>([]);
   const [isLoadingPhases, setIsLoadingPhases] = useState(true);
-  const [isDragInProgress, setIsDragInProgress] = useState(false);
-  
-  const phasesRef = useRef<ProjectPhase[]>([]);
-  const debounceTimeoutRef = useRef<NodeJS.Timeout>();
 
   const memoizedProjects = useMemo(() => projects, [projects]);
 
-  const phasesAreEqual = useCallback((oldPhases: ProjectPhase[], newPhases: ProjectPhase[]) => {
-    if (oldPhases.length !== newPhases.length) return false;
-    
-    for (let i = 0; i < oldPhases.length; i++) {
-      const oldPhase = oldPhases[i];
-      const newPhase = newPhases[i];
-      
-      if (oldPhase.id !== newPhase.id ||
-          oldPhase.startDate !== newPhase.startDate ||
-          oldPhase.endDate !== newPhase.endDate ||
-          oldPhase.projectId !== newPhase.projectId) {
-        return false;
-      }
-    }
-    return true;
-  }, []);
-
-  const updatePhasesDebounced = useCallback((newProjects: typeof projects) => {
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
-
-    // Use very long delay during drag to prevent any updates - this is the key fix
-    const debounceDelay = isDragInProgress ? 30000 : 300;
-
-    debounceTimeoutRef.current = setTimeout(async () => {
-      if (newProjects && newProjects.length > 0) {
-        console.log('Updating phases after debounce (drag in progress:', isDragInProgress, ')');
+  // Calculate phases when projects change
+  useEffect(() => {
+    const calculatePhases = async () => {
+      if (memoizedProjects && memoizedProjects.length > 0) {
+        console.log('Calculating phases for projects');
         setIsLoadingPhases(true);
         try {
-          const newPhases = await getProjectPhases(newProjects);
-          
-          if (!phasesAreEqual(phasesRef.current, newPhases)) {
-            console.log('Phases changed, updating state');
-            setPhases(newPhases);
-            phasesRef.current = newPhases;
-          } else {
-            console.log('Phases unchanged, skipping update');
-          }
+          const newPhases = await getProjectPhases(memoizedProjects);
+          setPhases(newPhases);
+        } catch (error) {
+          console.error('Error calculating phases:', error);
         } finally {
           setIsLoadingPhases(false);
         }
       } else if (!isLoadingProjects) {
         setPhases([]);
-        phasesRef.current = [];
         setIsLoadingPhases(false);
       }
-    }, debounceDelay);
-  }, [phasesAreEqual, isLoadingProjects, isDragInProgress]);
-
-  useEffect(() => {
-    // Skip phase recalculation completely if drag is in progress
-    if (isDragInProgress) {
-      console.log('Skipping phase update - drag in progress');
-      return;
-    }
-
-    updatePhasesDebounced(memoizedProjects);
-
-    return () => {
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
     };
-  }, [memoizedProjects, updatePhasesDebounced, isDragInProgress]);
 
-  const handleDragStateChange = useCallback((dragging: boolean) => {
-    console.log('Drag state changed:', dragging);
-    setIsDragInProgress(dragging);
-    
-    // Clear any pending debounced updates when drag starts
-    if (dragging && debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-      console.log('Cleared pending phase updates due to drag start');
-    }
-  }, []);
+    calculatePhases();
+  }, [memoizedProjects, isLoadingProjects]);
 
   const isLoading = isLoadingProjects || isLoadingPhases;
 
@@ -104,10 +46,7 @@ const CalendarPage = () => {
           <Skeleton className="h-[70vh] w-full" />
         </div>
       ) : (
-        <CalendarView 
-          phases={phases} 
-          onDragStateChange={handleDragStateChange}
-        />
+        <CalendarView phases={phases} />
       )}
     </div>
   );
