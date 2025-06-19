@@ -38,8 +38,11 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
 
   // Filter phases based on selected filters
   const filteredPhases = useMemo(() => {
-    if (selectedPhases.includes('all') || selectedPhases.length === 0) {
+    if (selectedPhases.includes('all')) {
       return phases;
+    }
+    if (selectedPhases.length === 0) {
+      return []; // Show no phases when "None" is selected
     }
     return phases.filter(phase => selectedPhases.includes(phase.phase));
   }, [phases, selectedPhases]);
