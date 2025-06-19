@@ -17,6 +17,7 @@ export const CalendarView = ({ phases }: CalendarViewProps) => {
   const [monthsToRender, setMonthsToRender] = useState([new Date()]);
   const [activePhase, setActivePhase] = useState<ProjectPhase | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [hasUserNavigated, setHasUserNavigated] = useState(false);
   const { holidays, isLoading: isLoadingHolidays } = useHolidays();
   const { rescheduleProject, isRescheduling } = useProjectRescheduling();
 
@@ -31,26 +32,32 @@ export const CalendarView = ({ phases }: CalendarViewProps) => {
 
   const loadPrevious = useCallback(() => {
     setMonthsToRender(prev => [subMonths(prev[0], 1), ...prev]);
+    setHasUserNavigated(true);
   }, []);
 
   const loadNext = useCallback(() => {
     setMonthsToRender(prev => [...prev, addMonths(prev[prev.length - 1], 1)]);
+    setHasUserNavigated(true);
   }, []);
 
   // Save scroll position before updates
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current;
-    if (scrollContainer && !isDragging) {
+    if (scrollContainer) {
       const handleScroll = () => {
         scrollPosition.current = scrollContainer.scrollTop;
+        // Mark as user navigated if they scroll significantly
+        if (!hasUserNavigated && scrollContainer.scrollTop > 100) {
+          setHasUserNavigated(true);
+        }
       };
       
       scrollContainer.addEventListener('scroll', handleScroll);
       return () => scrollContainer.removeEventListener('scroll', handleScroll);
     }
-  }, [isDragging]);
+  }, [hasUserNavigated]);
 
-  // Restore scroll position after updates (but not during initial load)
+  // Restore scroll position after updates (but not during/after drag operations)
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current;
     if (scrollContainer && hasScrolledToCurrentMonth.current && !isDragging && !isRescheduling) {
@@ -66,7 +73,7 @@ export const CalendarView = ({ phases }: CalendarViewProps) => {
   useEffect(() => {
     const currentObserver = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
-        if (entry.isIntersecting && !isDragging) {
+        if (entry.isIntersecting && !isDragging && !isRescheduling) {
           if (entry.target === topSentinelRef.current) {
             loadPrevious();
           } else if (entry.target === bottomSentinelRef.current) {
@@ -81,14 +88,20 @@ export const CalendarView = ({ phases }: CalendarViewProps) => {
     if (bottomSentinelRef.current) currentObserver.observe(bottomSentinelRef.current);
 
     return () => currentObserver.disconnect();
-  }, [loadPrevious, loadNext, isDragging]);
+  }, [loadPrevious, loadNext, isDragging, isRescheduling]);
 
+  // Only scroll to current month on initial load, not after user navigation or rescheduling
   useEffect(() => {
-    if (!isLoadingHolidays && currentMonthRef.current && !hasScrolledToCurrentMonth.current) {
-        currentMonthRef.current.scrollIntoView({ block: 'start' });
-        hasScrolledToCurrentMonth.current = true;
+    if (!isLoadingHolidays && 
+        currentMonthRef.current && 
+        !hasScrolledToCurrentMonth.current && 
+        !hasUserNavigated && 
+        !isDragging && 
+        !isRescheduling) {
+      currentMonthRef.current.scrollIntoView({ block: 'start' });
+      hasScrolledToCurrentMonth.current = true;
     }
-  }, [isLoadingHolidays, monthsToRender]);
+  }, [isLoadingHolidays, hasUserNavigated, isDragging, isRescheduling]);
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
