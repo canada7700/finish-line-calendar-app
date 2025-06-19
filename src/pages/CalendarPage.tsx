@@ -39,9 +39,12 @@ const CalendarPage = () => {
       clearTimeout(debounceTimeoutRef.current);
     }
 
+    // Much longer delay during drag to prevent any updates
+    const debounceDelay = isDragInProgress ? 10000 : 300;
+
     debounceTimeoutRef.current = setTimeout(async () => {
       if (newProjects && newProjects.length > 0) {
-        console.log('Updating phases after debounce');
+        console.log('Updating phases after debounce (drag in progress:', isDragInProgress, ')');
         setIsLoadingPhases(true);
         try {
           const newPhases = await getProjectPhases(newProjects);
@@ -61,7 +64,7 @@ const CalendarPage = () => {
         phasesRef.current = [];
         setIsLoadingPhases(false);
       }
-    }, isDragInProgress ? 2000 : 300); // Much longer delay during drag
+    }, debounceDelay);
   }, [phasesAreEqual, isLoadingProjects, isDragInProgress]);
 
   useEffect(() => {
@@ -83,6 +86,12 @@ const CalendarPage = () => {
   const handleDragStateChange = useCallback((dragging: boolean) => {
     console.log('Drag state changed:', dragging);
     setIsDragInProgress(dragging);
+    
+    // Clear any pending debounced updates when drag starts
+    if (dragging && debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+      console.log('Cleared pending phase updates due to drag start');
+    }
   }, []);
 
   const isLoading = isLoadingProjects || isLoadingPhases;

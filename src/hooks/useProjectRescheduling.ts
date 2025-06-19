@@ -30,6 +30,9 @@ export const useProjectRescheduling = () => {
       
       console.log('Recalculated project dates:', recalculatedProject);
 
+      // Delay database operation to allow UI to settle
+      await new Promise(resolve => setTimeout(resolve, 200));
+
       // Update the project directly in Supabase without going through useProjects
       const { error } = await supabase
         .from('projects')
@@ -78,22 +81,25 @@ export const useProjectRescheduling = () => {
       return { previousProjects };
     },
     onSuccess: (recalculatedProject, variables, context) => {
-      // Update the cache with the fully recalculated project (no invalidation)
-      queryClient.setQueryData(['projects'], (old: Project[] | undefined) => {
-        if (!old) return old;
-        
-        return old.map(p => {
-          if (p.id === recalculatedProject.id) {
-            return recalculatedProject;
-          }
-          return p;
+      // Delay cache update to allow scroll restoration to complete first
+      setTimeout(() => {
+        // Update the cache with the fully recalculated project (no invalidation)
+        queryClient.setQueryData(['projects'], (old: Project[] | undefined) => {
+          if (!old) return old;
+          
+          return old.map(p => {
+            if (p.id === recalculatedProject.id) {
+              return recalculatedProject;
+            }
+            return p;
+          });
         });
-      });
-      
-      toast({
-        title: "Project Rescheduled",
-        description: `${recalculatedProject.jobName} has been rescheduled successfully.`,
-      });
+        
+        toast({
+          title: "Project Rescheduled",
+          description: `${recalculatedProject.jobName} has been rescheduled successfully.`,
+        });
+      }, 300);
     },
     onError: (error, variables, context) => {
       console.error('Failed to reschedule project:', error);
