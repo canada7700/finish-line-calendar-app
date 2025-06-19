@@ -17,42 +17,40 @@ interface HourAllocationGridProps {
 const getPhaseColor = (phase: string) => {
   switch (phase) {
     case 'millwork':
-      return 'bg-purple-100 border-purple-300 text-purple-800 hover:bg-purple-200';
+      return 'bg-purple-100 border-purple-300 text-purple-800';
     case 'boxConstruction':
-      return 'bg-blue-100 border-blue-300 text-blue-800 hover:bg-blue-200';
+      return 'bg-blue-100 border-blue-300 text-blue-800';
     case 'stain':
-      return 'bg-amber-100 border-amber-300 text-amber-800 hover:bg-amber-200';
+      return 'bg-amber-100 border-amber-300 text-amber-800';
     case 'install':
-      return 'bg-green-100 border-green-300 text-green-800 hover:bg-green-200';
+      return 'bg-green-100 border-green-300 text-green-800';
     default:
-      return 'bg-gray-100 border-gray-300 text-gray-800 hover:bg-gray-200';
+      return 'bg-gray-100 border-gray-300 text-gray-800';
   }
 };
 
 const HourAllocationGrid = ({ allocations, date, onDeleteAllocation, isDeleting }: HourAllocationGridProps) => {
   const { teamMembers } = useTeamMembers();
   
-  // Generate hour blocks from 8 AM to 5 PM (9 hours total)
-  const hourBlocks = Array.from({ length: 9 }, (_, i) => i + 8);
-  
-  // Create a map of allocations by team member and hour
-  const allocationMap = new Map<string, Map<number, DailyHourAllocation[]>>();
+  // Create a map of allocations by team member
+  const allocationsByMember = new Map<string, DailyHourAllocation[]>();
   
   allocations.forEach(allocation => {
     const memberId = allocation.teamMemberId;
-    if (!allocationMap.has(memberId)) {
-      allocationMap.set(memberId, new Map());
+    if (!allocationsByMember.has(memberId)) {
+      allocationsByMember.set(memberId, []);
     }
-    const memberMap = allocationMap.get(memberId)!;
-    if (!memberMap.has(allocation.hourBlock)) {
-      memberMap.set(allocation.hourBlock, []);
-    }
-    memberMap.get(allocation.hourBlock)!.push(allocation);
+    allocationsByMember.get(memberId)!.push(allocation);
+  });
+
+  // Sort allocations within each member by hour
+  allocationsByMember.forEach((memberAllocations) => {
+    memberAllocations.sort((a, b) => a.hourBlock - b.hourBlock);
   });
 
   const activeMembers = teamMembers?.filter(member => member.isActive) || [];
   const membersWithAllocations = activeMembers.filter(member => 
-    allocationMap.has(member.id)
+    allocationsByMember.has(member.id)
   );
 
   if (allocations.length === 0) {
@@ -76,57 +74,61 @@ const HourAllocationGrid = ({ allocations, date, onDeleteAllocation, isDeleting 
         <CardTitle>Hour Allocation Grid - {format(date, 'MMMM d, yyyy')}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${hourBlocks.length}, 1fr)` }}>
-          {/* Hour headers */}
-          {hourBlocks.map(hour => (
-            <div key={`header-${hour}`} className="text-center font-semibold p-2 bg-muted rounded-md">
-              {hour}:00
-            </div>
-          ))}
-          
-          {/* Allocations for each hour */}
-          {hourBlocks.map(hour => (
-            <div key={`column-${hour}`} className="space-y-2">
-              {membersWithAllocations.map(member => {
-                const memberAllocations = allocationMap.get(member.id);
-                const hourAllocations = memberAllocations?.get(hour) || [];
+        <div className="grid gap-6" style={{ gridTemplateColumns: `repeat(${membersWithAllocations.length}, 1fr)` }}>
+          {membersWithAllocations.map(member => {
+            const memberAllocations = allocationsByMember.get(member.id) || [];
+            
+            return (
+              <div key={member.id} className="space-y-3">
+                {/* Team member name header */}
+                <div className="text-center font-semibold p-3 bg-gray-100 rounded-lg border">
+                  {member.name}
+                </div>
                 
-                return hourAllocations.map(allocation => (
-                  <div key={allocation.id} className="relative group">
-                    <div
-                      className={`
-                        border-2 rounded-lg p-3 cursor-pointer transition-all duration-200
-                        ${getPhaseColor(allocation.phase)}
-                        hover:shadow-md hover:scale-105
-                        relative
-                      `}
-                      title={`${member.name} - ${allocation.project?.jobName} - ${allocation.phase.toUpperCase()}`}
-                    >
-                      <div className="text-xs font-medium text-gray-600 mb-1">
-                        {member.name}
-                      </div>
-                      <div className="font-semibold text-sm leading-tight mb-1">
-                        {allocation.project?.jobName}
-                      </div>
-                      <div className="text-xs opacity-80 font-medium uppercase tracking-wide">
-                        {allocation.phase}
-                      </div>
-                      
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute -top-2 -right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity p-0 bg-white/90 hover:bg-white shadow-sm border rounded-full"
-                        onClick={() => onDeleteAllocation(allocation.id)}
-                        disabled={isDeleting}
+                {/* Allocations for this member */}
+                <div className="space-y-2">
+                  {memberAllocations.map(allocation => (
+                    <div key={allocation.id} className="relative group">
+                      <div
+                        className={`
+                          border rounded-lg p-3 transition-all duration-200
+                          ${getPhaseColor(allocation.phase)}
+                          hover:shadow-md hover:scale-105
+                          relative
+                        `}
+                        title={`${allocation.hourBlock}:00 - ${allocation.project?.jobName} - ${allocation.phase.toUpperCase()}`}
                       >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                        {/* Hour block */}
+                        <div className="text-xs font-bold text-gray-700 mb-1">
+                          {allocation.hourBlock}:00
+                        </div>
+                        
+                        {/* Project name */}
+                        <div className="font-semibold text-sm leading-tight mb-1">
+                          {allocation.project?.jobName}
+                        </div>
+                        
+                        {/* Phase */}
+                        <div className="text-xs font-medium uppercase tracking-wide opacity-80">
+                          {allocation.phase}
+                        </div>
+                        
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute -top-2 -right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity p-0 bg-white/90 hover:bg-white shadow-sm border rounded-full"
+                          onClick={() => onDeleteAllocation(allocation.id)}
+                          disabled={isDeleting}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                ));
-              })}
-            </div>
-          ))}
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </CardContent>
     </Card>
