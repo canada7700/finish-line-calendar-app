@@ -81,12 +81,18 @@ export const useProjects = () => {
       console.log('Project added successfully:', data);
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
-      toast({
-        title: "Project Added",
-        description: "Project has been added successfully.",
-      });
+      // Also invalidate calendar-related queries to refresh the view
+      queryClient.invalidateQueries({ queryKey: ['project-phases'] });
+      
+      // Only show success toast for non-custom projects
+      if (variables.status !== 'custom') {
+        toast({
+          title: "Project Added",
+          description: "Project has been added successfully.",
+        });
+      }
     },
     onError: (error) => {
       console.error('Failed to add project:', error);

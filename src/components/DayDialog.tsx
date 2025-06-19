@@ -1,3 +1,4 @@
+
 import * as React from 'react';
 import { ProjectPhase, ProjectNote, DailyNote } from '../types/project';
 import { format } from 'date-fns';
@@ -7,9 +8,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { useUpsertNote as useUpsertProjectNote } from '@/hooks/useProjectNotes';
 import { useUpsertDailyNote } from '@/hooks/useDailyNotes';
 import { useAddPhaseException } from '@/hooks/usePhaseExceptions';
-import { AlertTriangle, Trash2, Clock } from 'lucide-react';
+import { AlertTriangle, Trash2, Clock, Plus } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import HourAllocationDialog from './HourAllocationDialog';
+import CustomProjectDialog from './CustomProjectDialog';
 
 interface DayDialogProps {
   date: Date | null;
@@ -26,6 +28,8 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
   const [currentProjectNotes, setCurrentProjectNotes] = React.useState<Record<string, string>>({});
   const [currentDailyNote, setCurrentDailyNote] = React.useState('');
   const [showHourAllocation, setShowHourAllocation] = React.useState(false);
+  const [showCustomProject, setShowCustomProject] = React.useState(false);
+  const [newProjectContext, setNewProjectContext] = React.useState<{ projectId: string; phase: string } | null>(null);
   const upsertProjectNoteMutation = useUpsertProjectNote();
   const upsertDailyNoteMutation = useUpsertDailyNote();
   const addPhaseExceptionMutation = useAddPhaseException();
@@ -89,6 +93,14 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
     onNoteUpdate();
   };
 
+  const handleCustomProjectCreated = (projectId: string, phase: string) => {
+    // Store the new project context and open hour allocation
+    setNewProjectContext({ projectId, phase });
+    setShowHourAllocation(true);
+    // Trigger a refresh of the data
+    onNoteUpdate();
+  };
+
   const isSaving = upsertProjectNoteMutation.isPending || upsertDailyNoteMutation.isPending;
 
   return (
@@ -102,8 +114,8 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-            {/* Hour Allocation Management Button */}
-            <div className="flex justify-between items-center">
+            {/* Hour Allocation and Custom Project Management Buttons */}
+            <div className="grid grid-cols-2 gap-3">
               <Button 
                 onClick={() => setShowHourAllocation(true)}
                 className="flex items-center gap-2"
@@ -111,6 +123,14 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
               >
                 <Clock className="h-4 w-4" />
                 Manage Hour Allocations
+              </Button>
+              <Button 
+                onClick={() => setShowCustomProject(true)}
+                className="flex items-center gap-2"
+                variant="outline"
+              >
+                <Plus className="h-4 w-4" />
+                Create Custom Project
               </Button>
             </div>
 
@@ -181,9 +201,24 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
       <HourAllocationDialog
         date={date}
         phases={phases}
-        initialProjectPhase={selectedPhase}
+        initialProjectPhase={selectedPhase || (newProjectContext ? { 
+          projectId: newProjectContext.projectId, 
+          phase: newProjectContext.phase 
+        } as any : null)}
         open={showHourAllocation}
-        onOpenChange={setShowHourAllocation}
+        onOpenChange={(open) => {
+          setShowHourAllocation(open);
+          if (!open) {
+            setNewProjectContext(null);
+          }
+        }}
+      />
+
+      <CustomProjectDialog
+        date={date}
+        open={showCustomProject}
+        onOpenChange={setShowCustomProject}
+        onProjectCreated={handleCustomProjectCreated}
       />
     </>
   );
