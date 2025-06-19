@@ -2,7 +2,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ProjectScheduler } from '@/utils/projectScheduler';
 import { mapProjectToDatabase } from '@/utils/databaseMapping';
-import { dateInputToUTC } from '@/utils/timezoneUtils';
+import { format } from 'date-fns';
 import { Project } from '@/types/project';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -24,7 +24,7 @@ export const useProjectRescheduling = (isDragging?: boolean) => {
       // Convert the new install date to UTC string for calculations
       const updatedProject = {
         ...project,
-        installDate: dateInputToUTC(newInstallDate)
+        installDate: format(newInstallDate, 'yyyy-MM-dd')
       };
 
       // Recalculate all project dates based on new install date
@@ -63,7 +63,7 @@ export const useProjectRescheduling = (isDragging?: boolean) => {
           if (p.id === project.id) {
             return {
               ...p,
-              installDate: dateInputToUTC(newInstallDate)
+              installDate: format(newInstallDate, 'yyyy-MM-dd')
             };
           }
           return p;

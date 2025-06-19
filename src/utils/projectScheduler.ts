@@ -4,14 +4,23 @@ import { fromLocalToUTC, dateInputToUTC, createLocalDate } from './timezoneUtils
 import type { Project, ProjectPhase } from '../types/project';
 
 export class ProjectScheduler {
-  // Business days calculation that skips weekends
+  // Store holidays for business day calculations
+  private static holidays: Set<string> = new Set();
+
+  static setHolidays(holidayDates: string[]) {
+    this.holidays = new Set(holidayDates);
+  }
+
+  // Business days calculation that skips weekends AND holidays
   static addBusinessDays(startDate: Date, days: number): Date {
     let currentDate = new Date(startDate);
     let businessDaysAdded = 0;
     
     while (businessDaysAdded < days) {
       currentDate = addDays(currentDate, 1);
-      if (!isWeekend(currentDate)) {
+      const dateString = format(currentDate, 'yyyy-MM-dd');
+      
+      if (!isWeekend(currentDate) && !this.holidays.has(dateString)) {
         businessDaysAdded++;
       }
     }
@@ -25,7 +34,9 @@ export class ProjectScheduler {
     
     while (businessDaysSubtracted < days) {
       currentDate = addDays(currentDate, -1);
-      if (!isWeekend(currentDate)) {
+      const dateString = format(currentDate, 'yyyy-MM-dd');
+      
+      if (!isWeekend(currentDate) && !this.holidays.has(dateString)) {
         businessDaysSubtracted++;
       }
     }
@@ -34,11 +45,13 @@ export class ProjectScheduler {
   }
 
   static calculateProjectDates(project: Project): Project {
-    // Parse install date as local date, then work backwards
-    const installDateParts = project.installDate.split('-').map(Number);
-    const installDate = createLocalDate(installDateParts[0], installDateParts[1] - 1, installDateParts[2]);
+    // Parse install date directly as UTC since it's already stored as UTC in database
+    const installDate = parseISO(project.installDate + 'T00:00:00Z');
     
-    // Calculate all dates working backwards from install date
+    console.log('Calculating project dates for:', project.jobName);
+    console.log('Install date (UTC):', format(installDate, 'yyyy-MM-dd'));
+    
+    // Calculate all dates working backwards from install date in UTC
     const stainLacquerDate = this.subtractBusinessDays(installDate, 1);
     const stainStartDate = this.subtractBusinessDays(stainLacquerDate, Math.max(1, Math.ceil(project.stainHrs / 8)));
     const millingFillersDate = this.subtractBusinessDays(stainStartDate, 1);
@@ -47,16 +60,22 @@ export class ProjectScheduler {
     const millworkStartDate = this.subtractBusinessDays(boxConstructionStartDate, Math.max(1, Math.ceil(project.millworkHrs / 8)));
     const materialOrderDate = this.subtractBusinessDays(millworkStartDate, 10);
 
+    const calculatedDates = {
+      installDate: format(installDate, 'yyyy-MM-dd'),
+      materialOrderDate: format(materialOrderDate, 'yyyy-MM-dd'),
+      boxToekickAssemblyDate: format(boxToekickAssemblyDate, 'yyyy-MM-dd'),
+      millingFillersDate: format(millingFillersDate, 'yyyy-MM-dd'),
+      stainLacquerDate: format(stainLacquerDate, 'yyyy-MM-dd'),
+      millworkStartDate: format(millworkStartDate, 'yyyy-MM-dd'),
+      boxConstructionStartDate: format(boxConstructionStartDate, 'yyyy-MM-dd'),
+      stainStartDate: format(stainStartDate, 'yyyy-MM-dd'),
+    };
+
+    console.log('Calculated dates:', calculatedDates);
+
     return {
       ...project,
-      installDate: fromLocalToUTC(installDate),
-      materialOrderDate: fromLocalToUTC(materialOrderDate),
-      boxToekickAssemblyDate: fromLocalToUTC(boxToekickAssemblyDate),
-      millingFillersDate: fromLocalToUTC(millingFillersDate),
-      stainLacquerDate: fromLocalToUTC(stainLacquerDate),
-      millworkStartDate: fromLocalToUTC(millworkStartDate),
-      boxConstructionStartDate: fromLocalToUTC(boxConstructionStartDate),
-      stainStartDate: fromLocalToUTC(stainStartDate),
+      ...calculatedDates
     };
   }
 }
@@ -76,8 +95,8 @@ export const getProjectPhases = async (projects: Project[]): Promise<ProjectPhas
         // Calculate end date - for single day phases, start and end are the same
         let endDate = dateString;
         if (phaseHrs > 8) {
-          // Multi-day phase
-          const startDate = parseISO(dateString);
+          // Multi-day phase - calculate end date using business days
+          const startDate = parseISO(dateString + 'T00:00:00Z');
           const durationDays = Math.max(1, Math.ceil(phaseHrs / 8));
           const calculatedEndDate = ProjectScheduler.addBusinessDays(startDate, durationDays - 1);
           endDate = format(calculatedEndDate, 'yyyy-MM-dd');
