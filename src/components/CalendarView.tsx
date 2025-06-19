@@ -34,7 +34,7 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
   const [scrollLocked, setScrollLocked] = useState(false);
   
   const { holidays, isLoading: isLoadingHolidays } = useHolidays();
-  const { rescheduleProject, isRescheduling } = useProjectRescheduling();
+  const { rescheduleProject, isRescheduling, applyPendingUpdates } = useProjectRescheduling(isDragging);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -91,18 +91,27 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
                 scrollContainerRef.current.scrollTop = savedScrollPosition;
                 setSavedScrollPosition(null);
                 setScrollLocked(false);
+                
+                // Apply any pending cache updates after scroll is restored
+                setTimeout(() => {
+                  applyPendingUpdates();
+                }, 100);
               }
             });
           });
         });
       } else {
         setScrollLocked(false);
+        // Apply any pending cache updates
+        setTimeout(() => {
+          applyPendingUpdates();
+        }, 100);
       }
     }
   };
 
   const handleDragStart = (event: DragStartEvent) => {
-    console.log('Drag start - locking scroll position');
+    console.log('Drag start - locking scroll position and preventing cache updates');
     const { active } = event;
     
     // Lock the scroll position immediately
@@ -116,7 +125,7 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
-    console.log('Drag end - preparing to restore scroll position');
+    console.log('Drag end - preparing to restore scroll position and apply cache updates');
     const { active, over } = event;
     
     setActivePhase(null);

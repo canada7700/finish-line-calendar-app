@@ -5,9 +5,11 @@ import { Project, ProjectPhase } from '@/types/project';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { format, addDays, differenceInDays } from 'date-fns';
+import { useRef } from 'react';
 
-export const useProjectRescheduling = () => {
+export const useProjectRescheduling = (isDragInProgress: boolean = false) => {
   const queryClient = useQueryClient();
+  const pendingUpdatesRef = useRef<{ project: Project; originalData: any } | null>(null);
 
   const rescheduleProjectMutation = useMutation({
     mutationFn: async ({ 
@@ -29,9 +31,6 @@ export const useProjectRescheduling = () => {
       const recalculatedProject = await ProjectScheduler.calculateProjectDates(updatedProject);
       
       console.log('Recalculated project dates:', recalculatedProject);
-
-      // Delay database operation to allow UI to settle
-      await new Promise(resolve => setTimeout(resolve, 200));
 
       // Update the project directly in Supabase without going through useProjects
       const { error } = await supabase
@@ -62,28 +61,33 @@ export const useProjectRescheduling = () => {
       // Snapshot the previous value
       const previousProjects = queryClient.getQueryData(['projects']);
 
-      // Optimistically update the project in the cache
-      queryClient.setQueryData(['projects'], (old: Project[] | undefined) => {
-        if (!old) return old;
-        
-        return old.map(p => {
-          if (p.id === project.id) {
-            return {
-              ...p,
-              installDate: format(newInstallDate, 'yyyy-MM-dd')
-            };
-          }
-          return p;
+      // Only update cache if NOT dragging
+      if (!isDragInProgress) {
+        // Optimistically update the project in the cache
+        queryClient.setQueryData(['projects'], (old: Project[] | undefined) => {
+          if (!old) return old;
+          
+          return old.map(p => {
+            if (p.id === project.id) {
+              return {
+                ...p,
+                installDate: format(newInstallDate, 'yyyy-MM-dd')
+              };
+            }
+            return p;
+          });
         });
-      });
+      } else {
+        console.log('Skipping optimistic update - drag in progress');
+      }
 
       // Return a context object with the snapshotted value
       return { previousProjects };
     },
     onSuccess: (recalculatedProject, variables, context) => {
-      // Delay cache update to allow scroll restoration to complete first
-      setTimeout(() => {
-        // Update the cache with the fully recalculated project (no invalidation)
+      // Only update cache if NOT dragging
+      if (!isDragInProgress) {
+        // Update the cache with the fully recalculated project
         queryClient.setQueryData(['projects'], (old: Project[] | undefined) => {
           if (!old) return old;
           
@@ -99,13 +103,20 @@ export const useProjectRescheduling = () => {
           title: "Project Rescheduled",
           description: `${recalculatedProject.jobName} has been rescheduled successfully.`,
         });
-      }, 300);
+      } else {
+        // Store the update to apply later
+        console.log('Storing pending update - drag in progress');
+        pendingUpdatesRef.current = { 
+          project: recalculatedProject, 
+          originalData: context?.previousProjects 
+        };
+      }
     },
     onError: (error, variables, context) => {
       console.error('Failed to reschedule project:', error);
       
-      // Rollback the optimistic update
-      if (context?.previousProjects) {
+      // Rollback the optimistic update only if we actually made one
+      if (!isDragInProgress && context?.previousProjects) {
         queryClient.setQueryData(['projects'], context.previousProjects);
       }
       
@@ -116,6 +127,31 @@ export const useProjectRescheduling = () => {
       });
     }
   });
+
+  const applyPendingUpdates = () => {
+    if (pendingUpdatesRef.current) {
+      console.log('Applying pending cache update after drag completion');
+      const { project } = pendingUpdatesRef.current;
+      
+      queryClient.setQueryData(['projects'], (old: Project[] | undefined) => {
+        if (!old) return old;
+        
+        return old.map(p => {
+          if (p.id === project.id) {
+            return project;
+          }
+          return p;
+        });
+      });
+      
+      toast({
+        title: "Project Rescheduled",
+        description: `${project.jobName} has been rescheduled successfully.`,
+      });
+      
+      pendingUpdatesRef.current = null;
+    }
+  };
 
   const rescheduleProject = (project: Project, newInstallDate: Date) => {
     const currentInstallDate = new Date(`${project.installDate}T00:00:00`);
@@ -135,5 +171,6 @@ export const useProjectRescheduling = () => {
   return {
     rescheduleProject,
     isRescheduling: rescheduleProjectMutation.isPending,
+    applyPendingUpdates,
   };
 };
