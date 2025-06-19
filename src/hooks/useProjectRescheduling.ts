@@ -2,13 +2,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ProjectScheduler } from '@/utils/projectScheduler';
 import { Project, ProjectPhase } from '@/types/project';
-import { useProjects } from '@/hooks/useProjects';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { format, addDays, differenceInDays } from 'date-fns';
 
 export const useProjectRescheduling = () => {
   const queryClient = useQueryClient();
-  const { updateProject } = useProjects();
 
   const rescheduleProjectMutation = useMutation({
     mutationFn: async ({ 
@@ -30,6 +29,27 @@ export const useProjectRescheduling = () => {
       const recalculatedProject = await ProjectScheduler.calculateProjectDates(updatedProject);
       
       console.log('Recalculated project dates:', recalculatedProject);
+
+      // Update the project directly in Supabase without going through useProjects
+      const { error } = await supabase
+        .from('projects')
+        .update({
+          install_date: recalculatedProject.installDate,
+          material_order_date: recalculatedProject.materialOrderDate,
+          box_toekick_assembly_date: recalculatedProject.boxToekickAssemblyDate,
+          milling_fillers_date: recalculatedProject.millingFillersDate,
+          stain_lacquer_date: recalculatedProject.stainLacquerDate,
+          millwork_start_date: recalculatedProject.millworkStartDate,
+          box_construction_start_date: recalculatedProject.boxConstructionStartDate,
+          stain_start_date: recalculatedProject.stainStartDate
+        })
+        .eq('id', recalculatedProject.id);
+
+      if (error) {
+        console.error('Error updating project in database:', error);
+        throw error;
+      }
+
       return recalculatedProject;
     },
     onMutate: async ({ project, newInstallDate }) => {
@@ -58,40 +78,21 @@ export const useProjectRescheduling = () => {
       return { previousProjects };
     },
     onSuccess: (recalculatedProject, variables, context) => {
-      // Update the project in the database
-      updateProject(recalculatedProject, {
-        onSuccess: () => {
-          // Update the cache with the fully recalculated project
-          queryClient.setQueryData(['projects'], (old: Project[] | undefined) => {
-            if (!old) return old;
-            
-            return old.map(p => {
-              if (p.id === recalculatedProject.id) {
-                return recalculatedProject;
-              }
-              return p;
-            });
-          });
-          
-          toast({
-            title: "Project Rescheduled",
-            description: `${recalculatedProject.jobName} has been rescheduled successfully.`,
-          });
-        },
-        onError: (error) => {
-          console.error('Failed to update project:', error);
-          
-          // Rollback the optimistic update
-          if (context?.previousProjects) {
-            queryClient.setQueryData(['projects'], context.previousProjects);
+      // Update the cache with the fully recalculated project (no invalidation)
+      queryClient.setQueryData(['projects'], (old: Project[] | undefined) => {
+        if (!old) return old;
+        
+        return old.map(p => {
+          if (p.id === recalculatedProject.id) {
+            return recalculatedProject;
           }
-          
-          toast({
-            title: "Error",
-            description: "Failed to reschedule project. Please try again.",
-            variant: "destructive",
-          });
-        }
+          return p;
+        });
+      });
+      
+      toast({
+        title: "Project Rescheduled",
+        description: `${recalculatedProject.jobName} has been rescheduled successfully.`,
       });
     },
     onError: (error, variables, context) => {
@@ -104,7 +105,7 @@ export const useProjectRescheduling = () => {
       
       toast({
         title: "Error",
-        description: "Failed to calculate new project dates. Please try again.",
+        description: "Failed to reschedule project. Please try again.",
         variant: "destructive",
       });
     }
