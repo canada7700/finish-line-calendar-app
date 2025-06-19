@@ -1,5 +1,4 @@
-
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { ProjectPhase } from '../types/project';
 import { addMonths, subMonths } from 'date-fns';
 import { useHolidays } from '@/hooks/useHolidays';
@@ -8,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent } from '@dnd-kit/core';
 import MonthView from "./MonthView";
+import { PhaseFilter } from "./PhaseFilter";
 
 interface CalendarViewProps {
   phases: ProjectPhase[];
@@ -29,11 +29,24 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
   const [activePhase, setActivePhase] = useState<ProjectPhase | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [savedScrollPosition, setSavedScrollPosition] = useState<number | null>(null);
+  const [selectedPhases, setSelectedPhases] = useState<string[]>(['all']);
   
   const { holidays, isLoading: isLoadingHolidays } = useHolidays();
   const { rescheduleProject, isRescheduling } = useProjectRescheduling();
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Filter phases based on selected filters
+  const filteredPhases = useMemo(() => {
+    if (selectedPhases.includes('all') || selectedPhases.length === 0) {
+      return phases;
+    }
+    return phases.filter(phase => selectedPhases.includes(phase.phase));
+  }, [phases, selectedPhases]);
+
+  const handleFilterChange = (newSelectedPhases: string[]) => {
+    setSelectedPhases(newSelectedPhases);
+  };
 
   const handleDragStart = (event: DragStartEvent) => {
     console.log('Drag start - saving scroll position');
@@ -110,41 +123,45 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <ScrollArea className="h-full p-4 md:p-6" ref={scrollContainerRef}>
-        <div className="flex items-start gap-2 p-3 mb-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/30 rounded-md">
-          <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5" />
-          <div className="text-sm">
-            <div className="font-medium text-yellow-800 dark:text-yellow-200">Scheduling Information</div>
-            <div className="text-yellow-700 dark:text-yellow-300">
-              Work is only scheduled on business days (Monday-Friday, excluding holidays). 
-              Use the "Recalculate Dates" button on a project to ensure it follows this rule.
-              <br />
-              <strong>Drag install phases (marked with blue dots) to reschedule entire projects.</strong>
-            </div>
-          </div>
-        </div>
-
-        {isRescheduling && (
-          <div className="flex items-center justify-center gap-2 p-3 mb-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/30 rounded-md">
-            <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-            <div className="text-sm text-blue-800 dark:text-blue-200">
-              Rescheduling project...
-            </div>
-          </div>
-        )}
+      <div className="h-full flex flex-col">
+        <PhaseFilter phases={phases} onFilterChange={handleFilterChange} />
         
-        {!isLoadingHolidays ? (
-          monthsToRender.map(month => (
-            <div key={month.toISOString()}>
-              <MonthView monthDate={month} phases={phases} holidays={holidays} />
+        <ScrollArea className="flex-1 p-4 md:p-6" ref={scrollContainerRef}>
+          <div className="flex items-start gap-2 p-3 mb-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800/30 rounded-md">
+            <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5" />
+            <div className="text-sm">
+              <div className="font-medium text-yellow-800 dark:text-yellow-200">Scheduling Information</div>
+              <div className="text-yellow-700 dark:text-yellow-300">
+                Work is only scheduled on business days (Monday-Friday, excluding holidays). 
+                Use the "Recalculate Dates" button on a project to ensure it follows this rule.
+                <br />
+                <strong>Drag install phases (marked with blue dots) to reschedule entire projects.</strong>
+              </div>
             </div>
-          ))
-        ) : (
-          <div className="flex justify-center items-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin" />
           </div>
-        )}
-      </ScrollArea>
+
+          {isRescheduling && (
+            <div className="flex items-center justify-center gap-2 p-3 mb-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/30 rounded-md">
+              <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+              <div className="text-sm text-blue-800 dark:text-blue-200">
+                Rescheduling project...
+              </div>
+            </div>
+          )}
+          
+          {!isLoadingHolidays ? (
+            monthsToRender.map(month => (
+              <div key={month.toISOString()}>
+                <MonthView monthDate={month} phases={filteredPhases} holidays={holidays} />
+              </div>
+            ))
+          ) : (
+            <div className="flex justify-center items-center h-64">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          )}
+        </ScrollArea>
+      </div>
 
       <DragOverlay>
         {activePhase && (
