@@ -30,6 +30,8 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
   const [showHourAllocation, setShowHourAllocation] = React.useState(false);
   const [showCustomProject, setShowCustomProject] = React.useState(false);
   const [newProjectContext, setNewProjectContext] = React.useState<{ projectId: string; phase: string } | null>(null);
+  
+  // All hooks must be called unconditionally at the top level
   const upsertProjectNoteMutation = useUpsertProjectNote();
   const upsertDailyNoteMutation = useUpsertDailyNote();
   const addPhaseExceptionMutation = useAddPhaseException();
@@ -72,34 +74,20 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
     }
   }, [open]);
 
-  // Early return for invalid state
-  if (!date) {
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[625px]">
-          <div className="flex items-center justify-center py-8">
-            <div className="text-muted-foreground">Invalid date</div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  // Safely get projects for the day with comprehensive error handling
+  // Create projects map - this must be called unconditionally
   const projectsOnDay = React.useMemo(() => {
+    // Always call useMemo, but return empty array if invalid conditions
+    if (!date || !Array.isArray(phases)) {
+      return [];
+    }
+    
     try {
-      if (!Array.isArray(phases)) {
-        console.warn('⚠️ Phases is not an array:', phases);
-        return [];
-      }
-      
       const projectMap = new Map();
       
       phases.forEach(phase => {
         try {
           if (!phase?.projectId || !phase?.projectName) {
-            console.warn('⚠️ Skipping invalid phase:', phase);
-            return;
+            return; // Skip invalid phases
           }
           
           // Create safe phase object with all required properties
@@ -120,14 +108,25 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
         }
       });
       
-      const projects = Array.from(projectMap.values());
-      console.log('📋 Safe projects on day:', projects.length);
-      return projects;
+      return Array.from(projectMap.values());
     } catch (error) {
       console.error('❌ Error getting projects for day:', error);
       return [];
     }
-  }, [phases, date]);
+  }, [phases, date]); // Simplified dependencies
+
+  // Early return for invalid state - but after all hooks have been called
+  if (!date) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[625px]">
+          <div className="flex items-center justify-center py-8">
+            <div className="text-muted-foreground">Invalid date</div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   const handleProjectNoteChange = (projectId: string, value: string) => {
     setCurrentProjectNotes(prev => ({ ...prev, [projectId]: value }));
