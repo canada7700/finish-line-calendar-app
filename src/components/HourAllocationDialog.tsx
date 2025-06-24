@@ -31,7 +31,7 @@ const HourAllocationDialog = ({ date, phases, initialProjectPhase, open, onOpenC
   const [isAutoFilling, setIsAutoFilling] = React.useState(false);
   const [autoFillProgress, setAutoFillProgress] = React.useState(0);
   const [autoFillTotal, setAutoFillTotal] = React.useState(0);
-  const [isInitialDataLoaded, setIsInitialDataLoaded] = React.useState(false);
+  const [isInitialized, setIsInitialized] = React.useState(false);
 
   const { teamMembers, isLoading: isLoadingTeamMembers } = useTeamMembers();
   const { data: allocations = [], isLoading: isLoadingAllocations, refetch: refetchAllocations } = useDailyHourAllocations(date);
@@ -40,35 +40,46 @@ const HourAllocationDialog = ({ date, phases, initialProjectPhase, open, onOpenC
   const addAllocationSilentMutation = useAddHourAllocationSilent();
   const removeAllocationMutation = useRemoveHourAllocation();
 
+  // Use resilient capacity info that handles failures gracefully
   const { capacityInfo, hasOverAllocation } = useDayCapacityInfo(date, allocations, capacities);
 
-  // Track when initial data has loaded to prevent premature dialog closure
+  // Initialize dialog state when data is ready
   React.useEffect(() => {
-    if (!isLoadingTeamMembers && !isLoadingAllocations && !isLoadingCapacities) {
-      setIsInitialDataLoaded(true);
+    if (!isLoadingTeamMembers && !isLoadingAllocations && !isLoadingCapacities && open) {
+      console.log('Dialog data ready, initializing...');
+      setIsInitialized(true);
+      
+      // Set initial project/phase if provided
+      if (initialProjectPhase && !isInitialized) {
+        console.log('Setting initial project phase:', initialProjectPhase);
+        setSelectedProject(initialProjectPhase.projectId);
+        setSelectedPhase(initialProjectPhase.phase);
+      }
     }
-  }, [isLoadingTeamMembers, isLoadingAllocations, isLoadingCapacities]);
+  }, [isLoadingTeamMembers, isLoadingAllocations, isLoadingCapacities, open, initialProjectPhase, isInitialized]);
 
-  // Set initial values when dialog opens with selected phase context
+  // Reset state when dialog closes
   React.useEffect(() => {
-    if (open && initialProjectPhase && isInitialDataLoaded) {
-      setSelectedProject(initialProjectPhase.projectId);
-      setSelectedPhase(initialProjectPhase.phase);
-    } else if (!open) {
-      // Reset form when dialog closes
+    if (!open) {
+      console.log('Dialog closed, resetting state...');
       setSelectedProject('');
       setSelectedPhase('');
       setSelectedTeamMembers([]);
       setSelectedHourBlocks([]);
-      setIsInitialDataLoaded(false);
+      setIsInitialized(false);
     }
-  }, [open, initialProjectPhase, isInitialDataLoaded]);
+  }, [open]);
 
+  // Refresh data when dialog opens, but don't let failures close it
   React.useEffect(() => {
     if (open) {
-      console.log('🔄 Dialog opened, refreshing capacity data...');
-      refetchCapacities();
-      refetchAllocations();
+      console.log('🔄 Dialog opened, refreshing data...');
+      try {
+        refetchCapacities();
+        refetchAllocations();
+      } catch (error) {
+        console.warn('Failed to refresh data, continuing with existing data:', error);
+      }
     }
   }, [open, refetchCapacities, refetchAllocations]);
 
@@ -169,11 +180,19 @@ const HourAllocationDialog = ({ date, phases, initialProjectPhase, open, onOpenC
 
   const handleRefreshCapacities = async () => {
     console.log('🔄 Manually refreshing capacity data...');
-    await Promise.all([refetchCapacities(), refetchAllocations()]);
-    toast({
-      title: "Data Refreshed",
-      description: "Capacity and allocation data has been refreshed.",
-    });
+    try {
+      await Promise.all([refetchCapacities(), refetchAllocations()]);
+      toast({
+        title: "Data Refreshed",
+        description: "Capacity and allocation data has been refreshed.",
+      });
+    } catch (error) {
+      console.warn('Failed to refresh some data:', error);
+      toast({
+        title: "Partial Refresh",
+        description: "Some data was refreshed. The dialog will continue to work with available data.",
+      });
+    }
   };
 
   const handleAutoFill = async () => {

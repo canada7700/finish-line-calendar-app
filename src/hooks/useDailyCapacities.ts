@@ -62,16 +62,29 @@ export const useUpdatePhaseCapacity = () => {
 };
 
 export const useDayCapacityInfo = (date: Date, allocations: DailyHourAllocation[], capacities: DailyPhaseCapacity[]) => {
-  const { data: overrides = [] } = useDailyCapacityOverrides(date);
+  // Use a more resilient approach for capacity overrides - don't fail if they can't be loaded
+  const { data: overrides = [], error: overridesError } = useDailyCapacityOverrides(date);
   const dateString = date.toISOString().split('T')[0];
+  
+  // Log override errors but don't break the flow
+  if (overridesError) {
+    console.warn('Failed to load capacity overrides, using default capacities:', overridesError);
+  }
   
   const capacityInfo: DayCapacityInfo[] = capacities.map(capacity => {
     const allocated = allocations.filter(
       allocation => allocation.date === dateString && allocation.phase === capacity.phase
     ).length;
 
-    // Check if there's an override for this phase on this date
-    const override = overrides.find(o => o.phase === capacity.phase);
+    // Check if there's an override for this phase on this date, but handle gracefully if overrides failed
+    let override = null;
+    try {
+      override = overrides?.find(o => o.phase === capacity.phase) || null;
+    } catch (error) {
+      console.warn('Error processing capacity override:', error);
+      override = null;
+    }
+    
     const effectiveCapacity = override ? override.adjustedCapacity : capacity.maxHours;
 
     return {
@@ -92,6 +105,6 @@ export const useDayCapacityInfo = (date: Date, allocations: DailyHourAllocation[
     capacityInfo,
     hasOverAllocation,
     totalAllocated,
-    overrides,
+    overrides: overrides || [], // Ensure overrides is always an array
   };
 };

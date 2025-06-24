@@ -26,7 +26,9 @@ export const useDailyCapacityOverrides = (date: Date) => {
         .order('phase', { ascending: true });
 
       if (error) {
-        toast({ title: "Error fetching capacity overrides", description: error.message, variant: 'destructive' });
+        console.warn('Error fetching capacity overrides:', error);
+        // Don't show toast for capacity override errors, just log them
+        // This prevents UI disruption when overrides fail to load
         throw new Error(error.message);
       }
       
@@ -39,6 +41,15 @@ export const useDailyCapacityOverrides = (date: Date) => {
         createdAt: d.created_at,
         updatedAt: d.updated_at,
       }));
+    },
+    // Make this query more resilient to failures
+    retry: 1,
+    retryDelay: 1000,
+    // Don't refetch on window focus to reduce unnecessary requests
+    refetchOnWindowFocus: false,
+    // Provide a fallback empty array if query fails
+    onError: (error) => {
+      console.warn('Capacity overrides query failed, falling back to default capacities:', error);
     },
   });
 };
