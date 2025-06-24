@@ -58,10 +58,16 @@ export class ProjectScheduler {
   
   // Add business days to a date (skipping weekends and holidays)
   static addBusinessDays(startDate: Date, daysToAdd: number): Date {
+    // Handle edge cases
+    if (daysToAdd <= 0) {
+      console.log(`⚠️ Invalid daysToAdd: ${daysToAdd}, returning original date`);
+      return new Date(startDate);
+    }
+    
     let currentDate = new Date(startDate);
     let addedDays = 0;
     let iterations = 0;
-    const maxIterations = daysToAdd * 5; // Safety valve to prevent infinite loops
+    const maxIterations = Math.max(daysToAdd * 5, 50); // Ensure minimum safety valve
     
     console.log(`🔄 Adding ${daysToAdd} business days to ${format(startDate, 'yyyy-MM-dd')}`);
     
@@ -78,7 +84,8 @@ export class ProjectScheduler {
     }
     
     if (iterations >= maxIterations) {
-      console.error('⚠️ Reached maximum iterations while adding business days');
+      console.error('⚠️ Reached maximum iterations while adding business days, returning fallback date');
+      return addDays(startDate, daysToAdd); // Fallback to simple date addition
     }
     
     console.log(`✅ Final date after adding ${daysToAdd} business days: ${format(currentDate, 'yyyy-MM-dd')}`);
@@ -87,10 +94,16 @@ export class ProjectScheduler {
   
   // Subtract business days from a date (skipping weekends and holidays)
   static subtractBusinessDays(startDate: Date, daysToSubtract: number): Date {
+    // Handle edge cases
+    if (daysToSubtract <= 0) {
+      console.log(`⚠️ Invalid daysToSubtract: ${daysToSubtract}, returning original date`);
+      return new Date(startDate);
+    }
+    
     let currentDate = new Date(startDate);
     let subtractedDays = 0;
     let iterations = 0;
-    const maxIterations = daysToSubtract * 5; // Safety valve
+    const maxIterations = Math.max(daysToSubtract * 5, 50); // Ensure minimum safety valve
     
     console.log(`🔄 Subtracting ${daysToSubtract} business days from ${format(startDate, 'yyyy-MM-dd')}`);
     
@@ -107,7 +120,8 @@ export class ProjectScheduler {
     }
     
     if (iterations >= maxIterations) {
-      console.error('⚠️ Reached maximum iterations while subtracting business days');
+      console.error('⚠️ Reached maximum iterations while subtracting business days, returning fallback date');
+      return subDays(startDate, daysToSubtract); // Fallback to simple date subtraction
     }
     
     console.log(`✅ Final date after subtracting ${daysToSubtract} business days: ${format(currentDate, 'yyyy-MM-dd')}`);
@@ -232,321 +246,338 @@ export class ProjectScheduler {
   static async calculateProjectDatesFromInstallEnd(project: Project, installEndDate: Date): Promise<Project> {
     console.log('🎯 Starting project date calculation from install end date for:', project.jobName);
     
-    // Load holidays first - CRITICAL
-    await this.loadHolidays();
-    
-    // Get working hours and phase capacities
-    const { shopHours, stainHours, phaseCapacities } = await this.getWorkingHours();
-    
-    console.log('📅 Install end date:', format(installEndDate, 'yyyy-MM-dd'));
-    
-    // Validate install end date is a working day and adjust if needed
-    let finalInstallEndDate = installEndDate;
-    const installValidation = this.validateWorkingDay(installEndDate);
-    if (!installValidation.isValid) {
-      console.warn(`⚠️ Install end date ${format(installEndDate, 'yyyy-MM-dd')} is not a working day. Adjusting to ${format(installValidation.suggestedDate!, 'yyyy-MM-dd')}`);
-      finalInstallEndDate = installValidation.suggestedDate!;
+    try {
+      // Load holidays first - CRITICAL
+      await this.loadHolidays();
+      
+      // Get working hours and phase capacities
+      const { shopHours, stainHours, phaseCapacities } = await this.getWorkingHours();
+      
+      console.log('📅 Install end date:', format(installEndDate, 'yyyy-MM-dd'));
+      
+      // Validate install end date is a working day and adjust if needed
+      let finalInstallEndDate = installEndDate;
+      const installValidation = this.validateWorkingDay(installEndDate);
+      if (!installValidation.isValid) {
+        console.warn(`⚠️ Install end date ${format(installEndDate, 'yyyy-MM-dd')} is not a working day. Adjusting to ${format(installValidation.suggestedDate!, 'yyyy-MM-dd')}`);
+        finalInstallEndDate = installValidation.suggestedDate!;
+      }
+
+      // Calculate install start date from end date
+      const installDuration = Math.max(1, Math.ceil(project.installHrs / phaseCapacities.install));
+      const installStartDate = this.subtractBusinessDays(finalInstallEndDate, installDuration - 1);
+
+      console.log(`📊 Install duration: ${installDuration} days, from ${format(installStartDate, 'yyyy-MM-dd')} to ${format(finalInstallEndDate, 'yyyy-MM-dd')}`);
+
+      // Calculate other phase durations with safety checks
+      const stainDuration = Math.max(1, Math.ceil(project.stainHrs / phaseCapacities.stain));
+      const millworkDuration = Math.max(1, Math.ceil(project.millworkHrs / phaseCapacities.millwork));
+      const boxConstructionDuration = Math.max(1, Math.ceil(project.boxConstructionHrs / phaseCapacities.boxConstruction));
+      
+      console.log('📊 Project durations in business days (using phase capacities):', { 
+        installDuration, 
+        stainDuration, 
+        millworkDuration, 
+        boxConstructionDuration,
+        phaseCapacities 
+      });
+      
+      // Stain must complete before install (1 business day buffer)
+      const stainEndDate = this.getPreviousWorkingDay(installStartDate);
+      const stainStartDate = this.subtractBusinessDays(stainEndDate, stainDuration - 1);
+      
+      // Box construction must complete before stain (1 business day buffer)
+      const boxConstructionEndDate = this.getPreviousWorkingDay(stainStartDate);
+      const boxConstructionStartDate = this.subtractBusinessDays(boxConstructionEndDate, boxConstructionDuration - 1);
+      
+      // Millwork must complete before box construction (1 business day buffer)
+      const millworkEndDate = this.getPreviousWorkingDay(boxConstructionStartDate);
+      const millworkStartDate = this.subtractBusinessDays(millworkEndDate, millworkDuration - 1);
+
+      // Material order date is 60 calendar days before install start
+      let materialOrderDate = subDays(installStartDate, 60);
+      
+      // Ensure material order date is on a working day - move to previous working day if needed
+      if (!this.isWorkingDay(materialOrderDate)) {
+        const originalMaterialOrderDate = format(materialOrderDate, 'yyyy-MM-dd');
+        materialOrderDate = this.getPreviousWorkingDay(materialOrderDate);
+        console.log(`📦 Material order date ${originalMaterialOrderDate} adjusted to previous working day: ${format(materialOrderDate, 'yyyy-MM-dd')}`);
+      } else {
+        console.log(`📦 Material order date ${format(materialOrderDate, 'yyyy-MM-dd')} is already a working day`);
+      }
+
+      const calculatedDates = {
+        millworkStart: format(millworkStartDate, 'yyyy-MM-dd'),
+        millworkEnd: format(millworkEndDate, 'yyyy-MM-dd'),
+        boxConstructionStart: format(boxConstructionStartDate, 'yyyy-MM-dd'),
+        boxConstructionEnd: format(boxConstructionEndDate, 'yyyy-MM-dd'),
+        stainStart: format(stainStartDate, 'yyyy-MM-dd'),
+        stainEnd: format(stainEndDate, 'yyyy-MM-dd'),
+        installStart: format(installStartDate, 'yyyy-MM-dd'),
+        materialOrder: format(materialOrderDate, 'yyyy-MM-dd'),
+      };
+      
+      console.log('✅ Calculated project dates from install end:', calculatedDates);
+      
+      return {
+        ...project,
+        installDate: calculatedDates.installStart,
+        materialOrderDate: calculatedDates.materialOrder,
+        millworkStartDate: calculatedDates.millworkStart,
+        boxConstructionStartDate: calculatedDates.boxConstructionStart,
+        stainStartDate: calculatedDates.stainStart,
+        stainLacquerDate: calculatedDates.stainEnd,
+        millingFillersDate: calculatedDates.millworkEnd,
+        boxToekickAssemblyDate: calculatedDates.boxConstructionEnd,
+      };
+    } catch (error) {
+      console.error('❌ Error calculating project dates from install end:', error);
+      // Return original project with minimal changes if calculation fails
+      return project;
     }
-
-    // Calculate install start date from end date
-    const installDuration = Math.ceil(project.installHrs / phaseCapacities.install);
-    const installStartDate = this.subtractBusinessDays(finalInstallEndDate, installDuration - 1);
-
-    console.log(`📊 Install duration: ${installDuration} days, from ${format(installStartDate, 'yyyy-MM-dd')} to ${format(finalInstallEndDate, 'yyyy-MM-dd')}`);
-
-    // Calculate other phase durations
-    const stainDuration = Math.ceil(project.stainHrs / phaseCapacities.stain);
-    const millworkDuration = Math.ceil(project.millworkHrs / phaseCapacities.millwork);
-    const boxConstructionDuration = Math.ceil(project.boxConstructionHrs / phaseCapacities.boxConstruction);
-    
-    console.log('📊 Project durations in business days (using phase capacities):', { 
-      installDuration, 
-      stainDuration, 
-      millworkDuration, 
-      boxConstructionDuration,
-      phaseCapacities 
-    });
-    
-    // Stain must complete before install (1 business day buffer)
-    const stainEndDate = this.getPreviousWorkingDay(installStartDate);
-    const stainStartDate = this.subtractBusinessDays(stainEndDate, stainDuration - 1);
-    
-    // Box construction must complete before stain (1 business day buffer)
-    const boxConstructionEndDate = this.getPreviousWorkingDay(stainStartDate);
-    const boxConstructionStartDate = this.subtractBusinessDays(boxConstructionEndDate, boxConstructionDuration - 1);
-    
-    // Millwork must complete before box construction (1 business day buffer)
-    const millworkEndDate = this.getPreviousWorkingDay(boxConstructionStartDate);
-    const millworkStartDate = this.subtractBusinessDays(millworkEndDate, millworkDuration - 1);
-
-    // Material order date is 60 calendar days before install start
-    let materialOrderDate = subDays(installStartDate, 60);
-    
-    // Ensure material order date is on a working day - move to previous working day if needed
-    if (!this.isWorkingDay(materialOrderDate)) {
-      const originalMaterialOrderDate = format(materialOrderDate, 'yyyy-MM-dd');
-      materialOrderDate = this.getPreviousWorkingDay(materialOrderDate);
-      console.log(`📦 Material order date ${originalMaterialOrderDate} adjusted to previous working day: ${format(materialOrderDate, 'yyyy-MM-dd')}`);
-    } else {
-      console.log(`📦 Material order date ${format(materialOrderDate, 'yyyy-MM-dd')} is already a working day`);
-    }
-
-    const calculatedDates = {
-      millworkStart: format(millworkStartDate, 'yyyy-MM-dd'),
-      millworkEnd: format(millworkEndDate, 'yyyy-MM-dd'),
-      boxConstructionStart: format(boxConstructionStartDate, 'yyyy-MM-dd'),
-      boxConstructionEnd: format(boxConstructionEndDate, 'yyyy-MM-dd'),
-      stainStart: format(stainStartDate, 'yyyy-MM-dd'),
-      stainEnd: format(stainEndDate, 'yyyy-MM-dd'),
-      installStart: format(installStartDate, 'yyyy-MM-dd'),
-      materialOrder: format(materialOrderDate, 'yyyy-MM-dd'),
-    };
-    
-    console.log('✅ Calculated project dates from install end:', calculatedDates);
-    
-    return {
-      ...project,
-      installDate: calculatedDates.installStart,
-      materialOrderDate: calculatedDates.materialOrder,
-      millworkStartDate: calculatedDates.millworkStart,
-      boxConstructionStartDate: calculatedDates.boxConstructionStart,
-      stainStartDate: calculatedDates.stainStart,
-      stainLacquerDate: calculatedDates.stainEnd,
-      millingFillersDate: calculatedDates.millworkEnd,
-      boxToekickAssemblyDate: calculatedDates.boxConstructionEnd,
-    };
   }
   
   static async calculateProjectDates(project: Project): Promise<Project> {
     console.log('🎯 Starting project date calculation for:', project.jobName);
     
-    // Load holidays first - CRITICAL
-    await this.loadHolidays();
-    
-    // Get working hours and phase capacities
-    const { shopHours, stainHours, phaseCapacities } = await this.getWorkingHours();
-    
-    // By appending 'T00:00:00', we parse the date in the local timezone, not UTC.
-    const installDate = new Date(`${project.installDate}T00:00:00`);
-    console.log('📅 Original install date:', format(installDate, 'yyyy-MM-dd'));
-    
-    // Validate install date is a working day and adjust if needed
-    let finalInstallDate = installDate;
-    const installValidation = this.validateWorkingDay(installDate);
-    if (!installValidation.isValid) {
-      console.warn(`⚠️ Install date ${project.installDate} is not a working day. Adjusting to ${format(installValidation.suggestedDate!, 'yyyy-MM-dd')}`);
-      finalInstallDate = installValidation.suggestedDate!;
-    }
-    
-    // Material order date is 60 calendar days before install
-    let materialOrderDate = subDays(finalInstallDate, 60);
-    
-    // Ensure material order date is on a working day - move to previous working day if needed
-    if (!this.isWorkingDay(materialOrderDate)) {
-      const originalMaterialOrderDate = format(materialOrderDate, 'yyyy-MM-dd');
-      materialOrderDate = this.getPreviousWorkingDay(materialOrderDate);
-      console.log(`📦 Material order date ${originalMaterialOrderDate} adjusted to previous working day: ${format(materialOrderDate, 'yyyy-MM-dd')}`);
-    } else {
-      console.log(`📦 Material order date ${format(materialOrderDate, 'yyyy-MM-dd')} is already a working day`);
-    }
+    try {
+      // Load holidays first - CRITICAL
+      await this.loadHolidays();
+      
+      // Get working hours and phase capacities
+      const { shopHours, stainHours, phaseCapacities } = await this.getWorkingHours();
+      
+      // By appending 'T00:00:00', we parse the date in the local timezone, not UTC.
+      const installDate = new Date(`${project.installDate}T00:00:00`);
+      console.log('📅 Original install date:', format(installDate, 'yyyy-MM-dd'));
+      
+      // Validate install date is a working day and adjust if needed
+      let finalInstallDate = installDate;
+      const installValidation = this.validateWorkingDay(installDate);
+      if (!installValidation.isValid) {
+        console.warn(`⚠️ Install date ${project.installDate} is not a working day. Adjusting to ${format(installValidation.suggestedDate!, 'yyyy-MM-dd')}`);
+        finalInstallDate = installValidation.suggestedDate!;
+      }
+      
+      // Material order date is 60 calendar days before install
+      let materialOrderDate = subDays(finalInstallDate, 60);
+      
+      // Ensure material order date is on a working day - move to previous working day if needed
+      if (!this.isWorkingDay(materialOrderDate)) {
+        const originalMaterialOrderDate = format(materialOrderDate, 'yyyy-MM-dd');
+        materialOrderDate = this.getPreviousWorkingDay(materialOrderDate);
+        console.log(`📦 Material order date ${originalMaterialOrderDate} adjusted to previous working day: ${format(materialOrderDate, 'yyyy-MM-dd')}`);
+      } else {
+        console.log(`📦 Material order date ${format(materialOrderDate, 'yyyy-MM-dd')} is already a working day`);
+      }
 
-    // Calculate duration in business days using phase-specific capacities
-    const installDuration = Math.ceil(project.installHrs / phaseCapacities.install);
-    const stainDuration = Math.ceil(project.stainHrs / phaseCapacities.stain);
-    const millworkDuration = Math.ceil(project.millworkHrs / phaseCapacities.millwork);
-    const boxConstructionDuration = Math.ceil(project.boxConstructionHrs / phaseCapacities.boxConstruction);
-    
-    console.log('📊 Project durations in business days (using phase capacities):', { 
-      installDuration, 
-      stainDuration, 
-      millworkDuration, 
-      boxConstructionDuration,
-      phaseCapacities 
-    });
-    
-    // Stain must complete before install (1 business day buffer)
-    const stainEndDate = this.getPreviousWorkingDay(finalInstallDate);
-    const stainStartDate = this.subtractBusinessDays(stainEndDate, stainDuration - 1);
-    
-    // Box construction must complete before stain (1 business day buffer)
-    const boxConstructionEndDate = this.getPreviousWorkingDay(stainStartDate);
-    const boxConstructionStartDate = this.subtractBusinessDays(boxConstructionEndDate, boxConstructionDuration - 1);
-    
-    // Millwork must complete before box construction (1 business day buffer)
-    const millworkEndDate = this.getPreviousWorkingDay(boxConstructionStartDate);
-    const millworkStartDate = this.subtractBusinessDays(millworkEndDate, millworkDuration - 1);
+      // Calculate duration in business days using phase-specific capacities with safety checks
+      const installDuration = Math.max(1, Math.ceil(project.installHrs / phaseCapacities.install));
+      const stainDuration = Math.max(1, Math.ceil(project.stainHrs / phaseCapacities.stain));
+      const millworkDuration = Math.max(1, Math.ceil(project.millworkHrs / phaseCapacities.millwork));
+      const boxConstructionDuration = Math.max(1, Math.ceil(project.boxConstructionHrs / phaseCapacities.boxConstruction));
+      
+      console.log('📊 Project durations in business days (using phase capacities):', { 
+        installDuration, 
+        stainDuration, 
+        millworkDuration, 
+        boxConstructionDuration,
+        phaseCapacities 
+      });
+      
+      // Stain must complete before install (1 business day buffer)
+      const stainEndDate = this.getPreviousWorkingDay(finalInstallDate);
+      const stainStartDate = this.subtractBusinessDays(stainEndDate, stainDuration - 1);
+      
+      // Box construction must complete before stain (1 business day buffer)
+      const boxConstructionEndDate = this.getPreviousWorkingDay(stainStartDate);
+      const boxConstructionStartDate = this.subtractBusinessDays(boxConstructionEndDate, boxConstructionDuration - 1);
+      
+      // Millwork must complete before box construction (1 business day buffer)
+      const millworkEndDate = this.getPreviousWorkingDay(boxConstructionStartDate);
+      const millworkStartDate = this.subtractBusinessDays(millworkEndDate, millworkDuration - 1);
 
-    const calculatedDates = {
-      millworkStart: format(millworkStartDate, 'yyyy-MM-dd'),
-      millworkEnd: format(millworkEndDate, 'yyyy-MM-dd'),
-      boxConstructionStart: format(boxConstructionStartDate, 'yyyy-MM-dd'),
-      boxConstructionEnd: format(boxConstructionEndDate, 'yyyy-MM-dd'),
-      stainStart: format(stainStartDate, 'yyyy-MM-dd'),
-      stainEnd: format(stainEndDate, 'yyyy-MM-dd'),
-      install: format(finalInstallDate, 'yyyy-MM-dd'),
-      materialOrder: format(materialOrderDate, 'yyyy-MM-dd'),
-    };
-    
-    console.log('✅ Calculated project dates:', calculatedDates);
-    
-    return {
-      ...project,
-      installDate: calculatedDates.install, // Update install date if it was adjusted
-      materialOrderDate: calculatedDates.materialOrder,
-      millworkStartDate: calculatedDates.millworkStart,
-      boxConstructionStartDate: calculatedDates.boxConstructionStart,
-      stainStartDate: calculatedDates.stainStart,
-      stainLacquerDate: calculatedDates.stainEnd,
-      millingFillersDate: calculatedDates.millworkEnd,
-      boxToekickAssemblyDate: calculatedDates.boxConstructionEnd,
-    };
+      const calculatedDates = {
+        millworkStart: format(millworkStartDate, 'yyyy-MM-dd'),
+        millworkEnd: format(millworkEndDate, 'yyyy-MM-dd'),
+        boxConstructionStart: format(boxConstructionStartDate, 'yyyy-MM-dd'),
+        boxConstructionEnd: format(boxConstructionEndDate, 'yyyy-MM-dd'),
+        stainStart: format(stainStartDate, 'yyyy-MM-dd'),
+        stainEnd: format(stainEndDate, 'yyyy-MM-dd'),
+        install: format(finalInstallDate, 'yyyy-MM-dd'),
+        materialOrder: format(materialOrderDate, 'yyyy-MM-dd'),
+      };
+      
+      console.log('✅ Calculated project dates:', calculatedDates);
+      
+      return {
+        ...project,
+        installDate: calculatedDates.install, // Update install date if it was adjusted
+        materialOrderDate: calculatedDates.materialOrder,
+        millworkStartDate: calculatedDates.millworkStart,
+        boxConstructionStartDate: calculatedDates.boxConstructionStart,
+        stainStartDate: calculatedDates.stainStart,
+        stainLacquerDate: calculatedDates.stainEnd,
+        millingFillersDate: calculatedDates.millworkEnd,
+        boxToekickAssemblyDate: calculatedDates.boxConstructionEnd,
+      };
+    } catch (error) {
+      console.error('❌ Error calculating project dates:', error);
+      // Return original project with minimal changes if calculation fails
+      return project;
+    }
   }
   
   static async generateProjectPhases(project: Project): Promise<ProjectPhase[]> {
     console.log('🎭 Generating project phases for:', project.jobName);
     
-    // Ensure holidays are loaded FIRST - CRITICAL
-    await this.loadHolidays();
-    
-    const phases: ProjectPhase[] = [];
-    const calculatedProject = await this.calculateProjectDates(project);
-    const { shopHours, stainHours, phaseCapacities } = await this.getWorkingHours();
-    
-    // Material Order phase
-    if (calculatedProject.materialOrderDate) {
-      phases.push({
-        id: `${project.id}-material-order`,
-        projectId: project.id,
-        projectName: `${project.jobName} Material Order Date`,
-        phase: 'materialOrder',
-        startDate: calculatedProject.materialOrderDate,
-        endDate: calculatedProject.materialOrderDate,
-        hours: 0,
-        color: 'bg-red-600',
-      });
-      console.log(`✅ Created material order phase for ${calculatedProject.materialOrderDate}`);
-    }
+    try {
+      // Ensure holidays are loaded FIRST - CRITICAL
+      await this.loadHolidays();
+      
+      const phases: ProjectPhase[] = [];
+      const calculatedProject = await this.calculateProjectDates(project);
+      const { shopHours, stainHours, phaseCapacities } = await this.getWorkingHours();
+      
+      // Material Order phase
+      if (calculatedProject.materialOrderDate) {
+        phases.push({
+          id: `${project.id}-material-order`,
+          projectId: project.id,
+          projectName: `${project.jobName} Material Order Date`,
+          phase: 'materialOrder',
+          startDate: calculatedProject.materialOrderDate,
+          endDate: calculatedProject.materialOrderDate,
+          hours: 0,
+          color: 'bg-red-600',
+        });
+        console.log(`✅ Created material order phase for ${calculatedProject.materialOrderDate}`);
+      }
 
-    // Millwork phase - create individual phases for each working day
-    if (calculatedProject.millworkStartDate) {
-      const millworkStartDate = new Date(`${calculatedProject.millworkStartDate}T00:00:00`);
-      const millworkDuration = Math.ceil(project.millworkHrs / phaseCapacities.millwork);
-      
-      console.log(`🔨 Generating millwork phases for ${millworkDuration} working days starting ${format(millworkStartDate, 'yyyy-MM-dd')}`);
-      
-      let currentDate = new Date(millworkStartDate);
-      
-      for (let day = 0; day < millworkDuration; day++) {
-        while (!this.isWorkingDay(currentDate)) {
-          currentDate = addDays(currentDate, 1);
+      // Millwork phase - create individual phases for each working day
+      if (calculatedProject.millworkStartDate) {
+        const millworkStartDate = new Date(`${calculatedProject.millworkStartDate}T00:00:00`);
+        const millworkDuration = Math.max(1, Math.ceil(project.millworkHrs / phaseCapacities.millwork));
+        
+        console.log(`🔨 Generating millwork phases for ${millworkDuration} working days starting ${format(millworkStartDate, 'yyyy-MM-dd')}`);
+        
+        let currentDate = new Date(millworkStartDate);
+        
+        for (let day = 0; day < millworkDuration; day++) {
+          while (!this.isWorkingDay(currentDate)) {
+            currentDate = addDays(currentDate, 1);
+          }
+          
+          phases.push({
+            id: `${project.id}-millwork-${day}`,
+            projectId: project.id,
+            projectName: project.jobName,
+            phase: 'millwork',
+            startDate: format(currentDate, 'yyyy-MM-dd'),
+            endDate: format(currentDate, 'yyyy-MM-dd'),
+            hours: phaseCapacities.millwork, // Use actual daily capacity
+            color: 'bg-purple-500'
+          });
+          
+          console.log(`✅ Created millwork phase for ${format(currentDate, 'yyyy-MM-dd')} with ${phaseCapacities.millwork}h capacity`);
+          currentDate = this.getNextWorkingDay(currentDate);
         }
-        
-        phases.push({
-          id: `${project.id}-millwork-${day}`,
-          projectId: project.id,
-          projectName: project.jobName,
-          phase: 'millwork',
-          startDate: format(currentDate, 'yyyy-MM-dd'),
-          endDate: format(currentDate, 'yyyy-MM-dd'),
-          hours: phaseCapacities.millwork, // Use actual daily capacity
-          color: 'bg-purple-500'
-        });
-        
-        console.log(`✅ Created millwork phase for ${format(currentDate, 'yyyy-MM-dd')} with ${phaseCapacities.millwork}h capacity`);
-        currentDate = this.getNextWorkingDay(currentDate);
       }
-    }
 
-    // Box Construction phase - create individual phases for each working day
-    if (calculatedProject.boxConstructionStartDate) {
-      const boxConstructionStartDate = new Date(`${calculatedProject.boxConstructionStartDate}T00:00:00`);
-      const boxConstructionDuration = Math.ceil(project.boxConstructionHrs / phaseCapacities.boxConstruction);
+      // Box Construction phase - create individual phases for each working day
+      if (calculatedProject.boxConstructionStartDate) {
+        const boxConstructionStartDate = new Date(`${calculatedProject.boxConstructionStartDate}T00:00:00`);
+        const boxConstructionDuration = Math.max(1, Math.ceil(project.boxConstructionHrs / phaseCapacities.boxConstruction));
+        
+        console.log(`🔨 Generating box construction phases for ${boxConstructionDuration} working days starting ${format(boxConstructionStartDate, 'yyyy-MM-dd')}`);
+        
+        let currentDate = new Date(boxConstructionStartDate);
+        
+        for (let day = 0; day < boxConstructionDuration; day++) {
+          while (!this.isWorkingDay(currentDate)) {
+            currentDate = addDays(currentDate, 1);
+          }
+          
+          phases.push({
+            id: `${project.id}-box-${day}`,
+            projectId: project.id,
+            projectName: project.jobName,
+            phase: 'boxConstruction',
+            startDate: format(currentDate, 'yyyy-MM-dd'),
+            endDate: format(currentDate, 'yyyy-MM-dd'),
+            hours: phaseCapacities.boxConstruction, // Use actual daily capacity
+            color: 'bg-blue-500'
+          });
+          
+          console.log(`✅ Created box construction phase for ${format(currentDate, 'yyyy-MM-dd')} with ${phaseCapacities.boxConstruction}h capacity`);
+          currentDate = this.getNextWorkingDay(currentDate);
+        }
+      }
       
-      console.log(`🔨 Generating box construction phases for ${boxConstructionDuration} working days starting ${format(boxConstructionStartDate, 'yyyy-MM-dd')}`);
+      // Stain phase - create individual phases for each working day
+      if (calculatedProject.stainStartDate) {
+        const stainStartDate = new Date(`${calculatedProject.stainStartDate}T00:00:00`);
+        const stainDuration = Math.max(1, Math.ceil(project.stainHrs / phaseCapacities.stain));
+        
+        console.log(`🎨 Generating stain phases for ${stainDuration} working days starting ${format(stainStartDate, 'yyyy-MM-dd')}`);
+        
+        let currentDate = new Date(stainStartDate);
+        
+        for (let day = 0; day < stainDuration; day++) {
+          while (!this.isWorkingDay(currentDate)) {
+            currentDate = addDays(currentDate, 1);
+          }
+          
+          phases.push({
+            id: `${project.id}-stain-${day}`,
+            projectId: project.id,
+            projectName: project.jobName,
+            phase: 'stain',
+            startDate: format(currentDate, 'yyyy-MM-dd'),
+            endDate: format(currentDate, 'yyyy-MM-dd'),
+            hours: phaseCapacities.stain, // Use actual daily capacity
+            color: 'bg-amber-500'
+          });
+          
+          console.log(`✅ Created stain phase for ${format(currentDate, 'yyyy-MM-dd')} with ${phaseCapacities.stain}h capacity`);
+          currentDate = this.getNextWorkingDay(currentDate);
+        }
+      }
       
-      let currentDate = new Date(boxConstructionStartDate);
+      // Install phase - create individual phases for each working day
+      const installStartDate = new Date(`${calculatedProject.installDate}T00:00:00`);
+      const installDuration = Math.max(1, Math.ceil(project.installHrs / phaseCapacities.install));
       
-      for (let day = 0; day < boxConstructionDuration; day++) {
+      console.log(`🔧 Generating install phases for ${installDuration} working days starting ${format(installStartDate, 'yyyy-MM-dd')}`);
+      
+      let currentDate = new Date(installStartDate);
+      
+      for (let day = 0; day < installDuration; day++) {
         while (!this.isWorkingDay(currentDate)) {
           currentDate = addDays(currentDate, 1);
         }
         
         phases.push({
-          id: `${project.id}-box-${day}`,
+          id: `${project.id}-install-${day}`,
           projectId: project.id,
           projectName: project.jobName,
-          phase: 'boxConstruction',
+          phase: 'install',
           startDate: format(currentDate, 'yyyy-MM-dd'),
           endDate: format(currentDate, 'yyyy-MM-dd'),
-          hours: phaseCapacities.boxConstruction, // Use actual daily capacity
-          color: 'bg-blue-500'
+          hours: phaseCapacities.install, // Use actual daily capacity
+          color: 'bg-green-500'
         });
         
-        console.log(`✅ Created box construction phase for ${format(currentDate, 'yyyy-MM-dd')} with ${phaseCapacities.boxConstruction}h capacity`);
+        console.log(`✅ Created install phase for ${format(currentDate, 'yyyy-MM-dd')} with ${phaseCapacities.install}h capacity`);
         currentDate = this.getNextWorkingDay(currentDate);
       }
+      
+      console.log(`✅ Generated ${phases.length} project phases (working days only)`);
+      return phases;
+    } catch (error) {
+      console.error('❌ Error generating project phases:', error);
+      return []; // Return empty array on error to prevent crashes
     }
-    
-    // Stain phase - create individual phases for each working day
-    if (calculatedProject.stainStartDate) {
-      const stainStartDate = new Date(`${calculatedProject.stainStartDate}T00:00:00`);
-      const stainDuration = Math.ceil(project.stainHrs / phaseCapacities.stain);
-      
-      console.log(`🎨 Generating stain phases for ${stainDuration} working days starting ${format(stainStartDate, 'yyyy-MM-dd')}`);
-      
-      let currentDate = new Date(stainStartDate);
-      
-      for (let day = 0; day < stainDuration; day++) {
-        while (!this.isWorkingDay(currentDate)) {
-          currentDate = addDays(currentDate, 1);
-        }
-        
-        phases.push({
-          id: `${project.id}-stain-${day}`,
-          projectId: project.id,
-          projectName: project.jobName,
-          phase: 'stain',
-          startDate: format(currentDate, 'yyyy-MM-dd'),
-          endDate: format(currentDate, 'yyyy-MM-dd'),
-          hours: phaseCapacities.stain, // Use actual daily capacity
-          color: 'bg-amber-500'
-        });
-        
-        console.log(`✅ Created stain phase for ${format(currentDate, 'yyyy-MM-dd')} with ${phaseCapacities.stain}h capacity`);
-        currentDate = this.getNextWorkingDay(currentDate);
-      }
-    }
-    
-    // Install phase - create individual phases for each working day
-    const installStartDate = new Date(`${calculatedProject.installDate}T00:00:00`);
-    const installDuration = Math.ceil(project.installHrs / phaseCapacities.install);
-    
-    console.log(`🔧 Generating install phases for ${installDuration} working days starting ${format(installStartDate, 'yyyy-MM-dd')}`);
-    
-    let currentDate = new Date(installStartDate);
-    
-    for (let day = 0; day < installDuration; day++) {
-      while (!this.isWorkingDay(currentDate)) {
-        currentDate = addDays(currentDate, 1);
-      }
-      
-      phases.push({
-        id: `${project.id}-install-${day}`,
-        projectId: project.id,
-        projectName: project.jobName,
-        phase: 'install',
-        startDate: format(currentDate, 'yyyy-MM-dd'),
-        endDate: format(currentDate, 'yyyy-MM-dd'),
-        hours: phaseCapacities.install, // Use actual daily capacity
-        color: 'bg-green-500'
-      });
-      
-      console.log(`✅ Created install phase for ${format(currentDate, 'yyyy-MM-dd')} with ${phaseCapacities.install}h capacity`);
-      currentDate = this.getNextWorkingDay(currentDate);
-    }
-    
-    console.log(`✅ Generated ${phases.length} project phases (working days only)`);
-    return phases;
   }
   
   // Force refresh holidays (useful for debugging)

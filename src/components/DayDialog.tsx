@@ -30,43 +30,21 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
   const [showHourAllocation, setShowHourAllocation] = React.useState(false);
   const [showCustomProject, setShowCustomProject] = React.useState(false);
   const [newProjectContext, setNewProjectContext] = React.useState<{ projectId: string; phase: string } | null>(null);
-  const [isDialogStable, setIsDialogStable] = React.useState(false);
   const upsertProjectNoteMutation = useUpsertProjectNote();
   const upsertDailyNoteMutation = useUpsertDailyNote();
   const addPhaseExceptionMutation = useAddPhaseException();
 
-  // Add debugging for dialog stability
+  // Simplified initialization - no complex stability checks
   React.useEffect(() => {
-    if (open && date) {
-      console.log('🚀 DayDialog opening with stable state check...');
-      console.log('Date:', format(date, 'yyyy-MM-dd'));
-      console.log('Phases count:', phases?.length || 0);
-      console.log('Selected phase:', selectedPhase);
-      
-      // Add a small delay to ensure stable state
-      const timer = setTimeout(() => {
-        setIsDialogStable(true);
-        console.log('✅ Dialog marked as stable');
-      }, 100);
-
-      return () => {
-        clearTimeout(timer);
-      };
-    } else {
-      setIsDialogStable(false);
-    }
-  }, [open, date, selectedPhase]);
-
-  React.useEffect(() => {
-    if (date && open && isDialogStable) {
+    if (date && open) {
       try {
-        console.log('🔄 Initializing dialog state...');
-        const initialProjectNotes: Record<string, string> = {};
+        console.log('🔄 Initializing DayDialog state for:', format(date, 'yyyy-MM-dd'));
         
-        // Safely initialize project notes
+        // Initialize project notes safely
+        const initialProjectNotes: Record<string, string> = {};
         if (Array.isArray(projectNotes)) {
           projectNotes.forEach(note => {
-            if (note && note.project_id && typeof note.note === 'string') {
+            if (note?.project_id && typeof note.note === 'string') {
               initialProjectNotes[note.project_id] = note.note;
             }
           });
@@ -75,30 +53,39 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
         setCurrentProjectNotes(initialProjectNotes);
         setCurrentDailyNote(dailyNote?.note || '');
         
-        console.log('✅ Dialog state initialized successfully');
+        console.log('✅ DayDialog state initialized successfully');
       } catch (error) {
-        console.error('❌ Error initializing dialog state:', error);
-        // Set safe defaults
+        console.error('❌ Error initializing DayDialog state:', error);
+        // Set safe defaults on error
         setCurrentProjectNotes({});
         setCurrentDailyNote('');
       }
     }
-  }, [date, projectNotes, dailyNote, open, isDialogStable]);
+  }, [date, projectNotes, dailyNote, open]);
 
-  // Early return with stable check
-  if (!date || !isDialogStable) {
+  // Reset state when dialog closes
+  React.useEffect(() => {
+    if (!open) {
+      setCurrentProjectNotes({});
+      setCurrentDailyNote('');
+      setNewProjectContext(null);
+    }
+  }, [open]);
+
+  // Early return for invalid state
+  if (!date) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-[625px]">
           <div className="flex items-center justify-center py-8">
-            <div className="text-muted-foreground">Loading...</div>
+            <div className="text-muted-foreground">Invalid date</div>
           </div>
         </DialogContent>
       </Dialog>
     );
   }
 
-  // Safely get projects for the day with better error handling
+  // Safely get projects for the day with comprehensive error handling
   const projectsOnDay = React.useMemo(() => {
     try {
       if (!Array.isArray(phases)) {
@@ -107,28 +94,40 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
       }
       
       const projectMap = new Map();
+      
       phases.forEach(phase => {
-        if (phase && phase.projectId && phase.projectName) {
-          // Ensure we have a complete phase object
+        try {
+          if (!phase?.projectId || !phase?.projectName) {
+            console.warn('⚠️ Skipping invalid phase:', phase);
+            return;
+          }
+          
+          // Create safe phase object with all required properties
           const safePhase = {
-            ...phase,
-            phase: phase.phase || 'millwork', // Provide default
-            id: phase.id || `${phase.projectId}-${phase.phase}`,
-            color: phase.color || 'bg-blue-500',
-            hours: phase.hours || 0
+            id: phase.id || `${phase.projectId}-${phase.phase || 'unknown'}`,
+            projectId: phase.projectId,
+            projectName: phase.projectName,
+            phase: phase.phase || 'millwork',
+            startDate: phase.startDate || format(date, 'yyyy-MM-dd'),
+            endDate: phase.endDate || format(date, 'yyyy-MM-dd'),
+            hours: typeof phase.hours === 'number' ? phase.hours : 0,
+            color: phase.color || 'bg-blue-500'
           };
+          
           projectMap.set(phase.projectId, safePhase);
+        } catch (phaseError) {
+          console.error('❌ Error processing phase:', phaseError, phase);
         }
       });
       
       const projects = Array.from(projectMap.values());
-      console.log('📋 Projects on day:', projects.length);
+      console.log('📋 Safe projects on day:', projects.length);
       return projects;
     } catch (error) {
       console.error('❌ Error getting projects for day:', error);
       return [];
     }
-  }, [phases]);
+  }, [phases, date]);
 
   const handleProjectNoteChange = (projectId: string, value: string) => {
     setCurrentProjectNotes(prev => ({ ...prev, [projectId]: value }));
@@ -189,10 +188,7 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
 
   const handleCustomProjectCreated = (projectId: string, phase: string) => {
     console.log('🎯 Custom project created:', { projectId, phase });
-    // Store the new project context and add a delay before opening hour allocation
     setNewProjectContext({ projectId, phase });
-    
-    // Trigger a refresh of the data first
     onNoteUpdate();
     
     // Add a delay to allow data to refresh before opening the dialog
@@ -226,7 +222,7 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
         if (projectFromPhases) {
           return {
             ...projectFromPhases,
-            phase: newProjectContext.phase as 'millwork' | 'boxConstruction' | 'stain' | 'install' | 'materialOrder',
+            phase: newProjectContext.phase as 'millwork' | 'boxConstruction' | 'stain' | 'install',
             id: `${newProjectContext.projectId}-${newProjectContext.phase}`,
           };
         }
@@ -291,7 +287,7 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
               projectsOnDay.map(project => {
                 // Get phases for this project safely
                 const projectPhases = Array.isArray(phases) 
-                  ? phases.filter(p => p && p.projectId === project.projectId)
+                  ? phases.filter(p => p?.projectId === project.projectId)
                   : [];
                 
                 return (
