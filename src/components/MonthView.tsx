@@ -1,7 +1,9 @@
+
 import { useMemo, useState, useEffect } from 'react';
 import { ProjectPhase, ProjectNote, DailyNote } from '../types/project';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, startOfWeek, endOfWeek } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { AlertTriangle, MessageSquare, Clock } from 'lucide-react';
 import { Holiday } from '@/hooks/useHolidays';
 import { useProjectNotes } from '@/hooks/useProjectNotes';
@@ -291,29 +293,58 @@ const MonthView = ({ monthDate, phases, holidays, showCapacityView = false }: Mo
                           lastInstallDayByProject.get(phase.projectId) === phase.startDate;
                         
                         return (
-                          <DraggableProjectPhase
-                            key={phase.id}
-                            phase={phase}
-                            hasSchedulingConflict={hasSchedulingConflict}
-                            conflictReason={nonWorkingInfo.reason}
-                            isLastInstallDay={isLastInstallDay}
-                            onPhaseClick={(event) => handlePhaseClick(day, phase, event)}
-                          >
-                            <div
-                              className={`text-xs p-1 rounded text-white ${phase.color} truncate ${hasSchedulingConflict ? 'border border-red-300' : ''} relative`}
-                              title={`${phase.projectName} - ${phase.phase.toUpperCase()} (${phase.hours}h)${hasSchedulingConflict ? ' - CONFLICT: Scheduled on ' + nonWorkingInfo.reason : ''}`}
-                            >
-                              {phase.projectName}
-                              <div className="text-[10px] opacity-90">
-                                {phase.phase.toUpperCase()}
+                          <HoverCard key={phase.id}>
+                            <HoverCardTrigger asChild>
+                              <div>
+                                <DraggableProjectPhase
+                                  phase={phase}
+                                  hasSchedulingConflict={hasSchedulingConflict}
+                                  conflictReason={nonWorkingInfo.reason}
+                                  isLastInstallDay={isLastInstallDay}
+                                  onPhaseClick={(event) => handlePhaseClick(day, phase, event)}
+                                >
+                                  <div
+                                    className={`text-xs p-1 rounded text-white ${phase.color} truncate ${hasSchedulingConflict ? 'border border-red-300' : ''} relative cursor-pointer`}
+                                    title={`${phase.projectName} - ${phase.phase.toUpperCase()} (${phase.hours}h)${hasSchedulingConflict ? ' - CONFLICT: Scheduled on ' + nonWorkingInfo.reason : ''}`}
+                                  >
+                                    {phase.projectName}
+                                    {hasSchedulingConflict && (
+                                      <div className="text-[10px] text-red-200">
+                                        ⚠️ CONFLICT
+                                      </div>
+                                    )}
+                                  </div>
+                                </DraggableProjectPhase>
                               </div>
-                              {hasSchedulingConflict && (
-                                <div className="text-[10px] text-red-200">
-                                  ⚠️ CONFLICT
+                            </HoverCardTrigger>
+                            <HoverCardContent className="w-64 p-3">
+                              <div className="space-y-2">
+                                <div className="font-medium text-sm">{phase.projectName}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-medium">{phase.phase.toUpperCase()}</span>
+                                    <span>{phase.hours} hours</span>
+                                  </div>
+                                  <div className="mt-1">
+                                    <div className={`inline-block px-2 py-1 rounded text-white text-xs ${phase.color}`}>
+                                      {phase.phase.charAt(0).toUpperCase() + phase.phase.slice(1)} Phase
+                                    </div>
+                                  </div>
                                 </div>
-                              )}
-                            </div>
-                          </DraggableProjectPhase>
+                                {hasSchedulingConflict && (
+                                  <div className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    <span>Scheduled on {nonWorkingInfo.reason}</span>
+                                  </div>
+                                )}
+                                {isLastInstallDay && (
+                                  <div className="text-xs text-blue-600 dark:text-blue-400">
+                                    • Drag to reschedule entire project
+                                  </div>
+                                )}
+                              </div>
+                            </HoverCardContent>
+                          </HoverCard>
                         );
                       })}
                     </div>
