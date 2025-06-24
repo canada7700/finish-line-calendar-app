@@ -1,3 +1,4 @@
+
 import * as React from 'react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -31,11 +32,10 @@ const HourAllocationDialog = ({ date, phases, initialProjectPhase, open, onOpenC
   const [isAutoFilling, setIsAutoFilling] = React.useState(false);
   const [autoFillProgress, setAutoFillProgress] = React.useState(0);
   const [autoFillTotal, setAutoFillTotal] = React.useState(0);
-  const [isInitialized, setIsInitialized] = React.useState(false);
 
   const { teamMembers, isLoading: isLoadingTeamMembers } = useTeamMembers();
-  const { data: allocations = [], isLoading: isLoadingAllocations, refetch: refetchAllocations } = useDailyHourAllocations(date);
-  const { data: capacities = [], isLoading: isLoadingCapacities, refetch: refetchCapacities } = useDailyPhaseCapacities();
+  const { data: allocations = [], isLoading: isLoadingAllocations } = useDailyHourAllocations(date);
+  const { data: capacities = [], isLoading: isLoadingCapacities } = useDailyPhaseCapacities();
   const addAllocationMutation = useAddHourAllocation();
   const addAllocationSilentMutation = useAddHourAllocationSilent();
   const removeAllocationMutation = useRemoveHourAllocation();
@@ -43,20 +43,14 @@ const HourAllocationDialog = ({ date, phases, initialProjectPhase, open, onOpenC
   // Use resilient capacity info that handles failures gracefully
   const { capacityInfo, hasOverAllocation } = useDayCapacityInfo(date, allocations, capacities);
 
-  // Initialize dialog state when data is ready
+  // Set initial project/phase if provided
   React.useEffect(() => {
-    if (!isLoadingTeamMembers && !isLoadingAllocations && !isLoadingCapacities && open) {
-      console.log('Dialog data ready, initializing...');
-      setIsInitialized(true);
-      
-      // Set initial project/phase if provided
-      if (initialProjectPhase && !isInitialized) {
-        console.log('Setting initial project phase:', initialProjectPhase);
-        setSelectedProject(initialProjectPhase.projectId);
-        setSelectedPhase(initialProjectPhase.phase);
-      }
+    if (initialProjectPhase && open) {
+      console.log('Setting initial project phase:', initialProjectPhase);
+      setSelectedProject(initialProjectPhase.projectId);
+      setSelectedPhase(initialProjectPhase.phase);
     }
-  }, [isLoadingTeamMembers, isLoadingAllocations, isLoadingCapacities, open, initialProjectPhase, isInitialized]);
+  }, [initialProjectPhase, open]);
 
   // Reset state when dialog closes
   React.useEffect(() => {
@@ -66,22 +60,8 @@ const HourAllocationDialog = ({ date, phases, initialProjectPhase, open, onOpenC
       setSelectedPhase('');
       setSelectedTeamMembers([]);
       setSelectedHourBlocks([]);
-      setIsInitialized(false);
     }
   }, [open]);
-
-  // Refresh data when dialog opens, but don't let failures close it
-  React.useEffect(() => {
-    if (open) {
-      console.log('🔄 Dialog opened, refreshing data...');
-      try {
-        refetchCapacities();
-        refetchAllocations();
-      } catch (error) {
-        console.warn('Failed to refresh data, continuing with existing data:', error);
-      }
-    }
-  }, [open, refetchCapacities, refetchAllocations]);
 
   const availableProjects = React.useMemo(() => {
     return Array.from(new Map(phases.map(p => [p.projectId, { id: p.projectId, name: p.projectName }])).values());
@@ -176,23 +156,6 @@ const HourAllocationDialog = ({ date, phases, initialProjectPhase, open, onOpenC
 
   const handleClearSelection = () => {
     setSelectedHourBlocks([]);
-  };
-
-  const handleRefreshCapacities = async () => {
-    console.log('🔄 Manually refreshing capacity data...');
-    try {
-      await Promise.all([refetchCapacities(), refetchAllocations()]);
-      toast({
-        title: "Data Refreshed",
-        description: "Capacity and allocation data has been refreshed.",
-      });
-    } catch (error) {
-      console.warn('Failed to refresh some data:', error);
-      toast({
-        title: "Partial Refresh",
-        description: "Some data was refreshed. The dialog will continue to work with available data.",
-      });
-    }
   };
 
   const handleAutoFill = async () => {
@@ -422,16 +385,6 @@ const HourAllocationDialog = ({ date, phases, initialProjectPhase, open, onOpenC
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>Hour Allocations for {format(date, 'MMMM d, yyyy')}</span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefreshCapacities}
-              disabled={isLoadingCapacities}
-              className="ml-2"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingCapacities ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
           </DialogTitle>
           <DialogDescription>
             Assign team members to specific hour blocks for different project phases. Work day is 8 AM to 5 PM. Team members cannot be double-booked.

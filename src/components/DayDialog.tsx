@@ -105,6 +105,35 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
     }, 500);
   };
 
+  // Create a proper ProjectPhase object for the new project context
+  const getInitialProjectPhase = () => {
+    if (selectedPhase) return selectedPhase;
+    
+    if (newProjectContext) {
+      // Find the project phase from the phases array
+      const projectPhase = phases.find(p => 
+        p.projectId === newProjectContext.projectId && 
+        p.phase === newProjectContext.phase
+      );
+      
+      if (projectPhase) {
+        return projectPhase;
+      }
+      
+      // If not found in phases (newly created project), create a minimal phase object
+      const projectFromPhases = phases.find(p => p.projectId === newProjectContext.projectId);
+      if (projectFromPhases) {
+        return {
+          ...projectFromPhases,
+          phase: newProjectContext.phase,
+          id: `${newProjectContext.projectId}-${newProjectContext.phase}`,
+        };
+      }
+    }
+    
+    return null;
+  };
+
   const isSaving = upsertProjectNoteMutation.isPending || upsertDailyNoteMutation.isPending;
 
   return (
@@ -205,10 +234,7 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
       <HourAllocationDialog
         date={date}
         phases={phases}
-        initialProjectPhase={selectedPhase || (newProjectContext ? { 
-          projectId: newProjectContext.projectId, 
-          phase: newProjectContext.phase 
-        } as any : null)}
+        initialProjectPhase={getInitialProjectPhase()}
         open={showHourAllocation}
         onOpenChange={(open) => {
           setShowHourAllocation(open);

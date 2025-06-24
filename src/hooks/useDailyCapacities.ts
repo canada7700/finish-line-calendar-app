@@ -79,7 +79,10 @@ export const useDayCapacityInfo = (date: Date, allocations: DailyHourAllocation[
     // Check if there's an override for this phase on this date, but handle gracefully if overrides failed
     let override = null;
     try {
-      override = overrides?.find(o => o.phase === capacity.phase) || null;
+      // Only try to find overrides if we have the data and no error
+      if (!overridesError && Array.isArray(overrides)) {
+        override = overrides.find(o => o.phase === capacity.phase) || null;
+      }
     } catch (error) {
       console.warn('Error processing capacity override:', error);
       override = null;
