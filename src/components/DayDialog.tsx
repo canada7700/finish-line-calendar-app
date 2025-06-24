@@ -34,20 +34,69 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
   const upsertDailyNoteMutation = useUpsertDailyNote();
   const addPhaseExceptionMutation = useAddPhaseException();
 
+  // Add debugging for custom project clicks
   React.useEffect(() => {
-    if (date) {
-      const initialProjectNotes: Record<string, string> = {};
-      projectNotes.forEach(note => {
-        initialProjectNotes[note.project_id] = note.note;
-      });
-      setCurrentProjectNotes(initialProjectNotes);
-      setCurrentDailyNote(dailyNote?.note || '');
+    if (open && date) {
+      console.log('DayDialog opened for date:', format(date, 'yyyy-MM-dd'));
+      console.log('Available phases:', phases);
+      console.log('Project notes:', projectNotes);
+      console.log('Daily note:', dailyNote);
+      console.log('Selected phase:', selectedPhase);
+    }
+  }, [open, date, phases, projectNotes, dailyNote, selectedPhase]);
+
+  React.useEffect(() => {
+    if (date && open) {
+      try {
+        const initialProjectNotes: Record<string, string> = {};
+        
+        // Safely initialize project notes
+        if (Array.isArray(projectNotes)) {
+          projectNotes.forEach(note => {
+            if (note && note.project_id && typeof note.note === 'string') {
+              initialProjectNotes[note.project_id] = note.note;
+            }
+          });
+        }
+        
+        setCurrentProjectNotes(initialProjectNotes);
+        setCurrentDailyNote(dailyNote?.note || '');
+        
+        console.log('Initialized project notes:', initialProjectNotes);
+      } catch (error) {
+        console.error('Error initializing dialog state:', error);
+        // Set safe defaults
+        setCurrentProjectNotes({});
+        setCurrentDailyNote('');
+      }
     }
   }, [date, projectNotes, dailyNote, open]);
 
   if (!date) return null;
 
-  const projectsOnDay = Array.from(new Map(phases.map(p => [p.projectId, p])).values());
+  // Safely get projects for the day
+  const projectsOnDay = React.useMemo(() => {
+    try {
+      if (!Array.isArray(phases)) {
+        console.warn('Phases is not an array:', phases);
+        return [];
+      }
+      
+      const projectMap = new Map();
+      phases.forEach(phase => {
+        if (phase && phase.projectId && phase.projectName) {
+          projectMap.set(phase.projectId, phase);
+        }
+      });
+      
+      const projects = Array.from(projectMap.values());
+      console.log('Projects on day:', projects);
+      return projects;
+    } catch (error) {
+      console.error('Error getting projects for day:', error);
+      return [];
+    }
+  }, [phases]);
 
   const handleProjectNoteChange = (projectId: string, value: string) => {
     setCurrentProjectNotes(prev => ({ ...prev, [projectId]: value }));
@@ -55,42 +104,51 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
   
   const handleSaveNotes = async () => {
     if (!date) return;
-    const dateString = format(date, 'yyyy-MM-dd');
     
-    const projectNotePromises = Object.entries(currentProjectNotes).map(([projectId, note]) => {
-      const originalNote = projectNotes.find(n => n.project_id === projectId);
-      // Upsert only if note has changed or is new
-      if (note !== (originalNote?.note || '')) {
-        return upsertProjectNoteMutation.mutateAsync({
-          project_id: projectId,
-          date: dateString,
-          note: note,
-        });
-      }
-      return Promise.resolve();
-    });
+    try {
+      const dateString = format(date, 'yyyy-MM-dd');
+      
+      const projectNotePromises = Object.entries(currentProjectNotes).map(([projectId, note]) => {
+        const originalNote = projectNotes.find(n => n.project_id === projectId);
+        // Upsert only if note has changed or is new
+        if (note !== (originalNote?.note || '')) {
+          return upsertProjectNoteMutation.mutateAsync({
+            project_id: projectId,
+            date: dateString,
+            note: note,
+          });
+        }
+        return Promise.resolve();
+      });
 
-    const dailyNotePromise = (currentDailyNote !== (dailyNote?.note || '')) 
-      ? upsertDailyNoteMutation.mutateAsync({
-          date: dateString,
-          note: currentDailyNote,
-        })
-      : Promise.resolve();
+      const dailyNotePromise = (currentDailyNote !== (dailyNote?.note || '')) 
+        ? upsertDailyNoteMutation.mutateAsync({
+            date: dateString,
+            note: currentDailyNote,
+          })
+        : Promise.resolve();
 
-    await Promise.all([...projectNotePromises, dailyNotePromise]);
-    onNoteUpdate();
-    onOpenChange(false);
+      await Promise.all([...projectNotePromises, dailyNotePromise]);
+      onNoteUpdate();
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Error saving notes:', error);
+    }
   };
 
   const handlePhaseDelete = async (phaseToDelete: ProjectPhase) => {
     if (!date) return;
     
-    await addPhaseExceptionMutation.mutateAsync({
-      project_id: phaseToDelete.projectId,
-      phase: phaseToDelete.phase,
-      date: format(date, 'yyyy-MM-dd'),
-    });
-    onNoteUpdate();
+    try {
+      await addPhaseExceptionMutation.mutateAsync({
+        project_id: phaseToDelete.projectId,
+        phase: phaseToDelete.phase,
+        date: format(date, 'yyyy-MM-dd'),
+      });
+      onNoteUpdate();
+    } catch (error) {
+      console.error('Error deleting phase:', error);
+    }
   };
 
   const handleCustomProjectCreated = (projectId: string, phase: string) => {
@@ -184,43 +242,52 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
             {projectsOnDay.length > 0 && <Separator className="my-4" />}
 
             {projectsOnDay.length > 0 ? (
-              projectsOnDay.map(project => (
-                <div key={project.projectId} className="p-4 border rounded-lg">
-                  <h4 className="font-semibold text-lg mb-2">
-                    {project.projectName || `Project ${project.projectId}`}
-                  </h4>
-                  <div className="space-y-2 mb-3">
-                    {phases.filter(p => p.projectId === project.projectId).map(phase => (
-                      <div key={phase.id} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
-                        <div className="flex items-center gap-2">
-                          <span className={`h-3 w-3 rounded-full ${phase.color}`}></span>
-                          <span className="font-medium">{phase.phase.toUpperCase()}</span>
-                          <span className="text-sm text-muted-foreground">({phase.hours}h)</span>
+              projectsOnDay.map(project => {
+                // Get phases for this project safely
+                const projectPhases = Array.isArray(phases) 
+                  ? phases.filter(p => p && p.projectId === project.projectId)
+                  : [];
+                
+                return (
+                  <div key={project.projectId} className="p-4 border rounded-lg">
+                    <h4 className="font-semibold text-lg mb-2">
+                      {project.projectName || `Project ${project.projectId}`}
+                    </h4>
+                    <div className="space-y-2 mb-3">
+                      {projectPhases.map(phase => (
+                        <div key={phase.id} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
+                          <div className="flex items-center gap-2">
+                            <span className={`h-3 w-3 rounded-full ${phase.color}`}></span>
+                            <span className="font-medium">{phase.phase.toUpperCase()}</span>
+                            <span className="text-sm text-muted-foreground">({phase.hours}h)</span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            onClick={() => handlePhaseDelete(phase)}
+                            disabled={addPhaseExceptionMutation.isPending}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          onClick={() => handlePhaseDelete(phase)}
-                          disabled={addPhaseExceptionMutation.isPending}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
+                    <div>
+                      <label htmlFor={`note-${project.projectId}`} className="text-sm font-medium text-muted-foreground mb-1 block">
+                        Notes for {project.projectName || `Project ${project.projectId}`}
+                      </label>
+                      <Textarea
+                        id={`note-${project.projectId}`}
+                        placeholder={`Add a project-specific note for this day...`}
+                        value={currentProjectNotes[project.projectId] || ''}
+                        onChange={(e) => handleProjectNoteChange(project.projectId, e.target.value)}
+                        className="min-h-[80px]"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label htmlFor={`note-${project.projectId}`} className="text-sm font-medium text-muted-foreground mb-1 block">Notes for {project.projectName || `Project ${project.projectId}`}</label>
-                    <Textarea
-                      id={`note-${project.projectId}`}
-                      placeholder={`Add a project-specific note for this day...`}
-                      value={currentProjectNotes[project.projectId] || ''}
-                      onChange={(e) => handleProjectNoteChange(project.projectId, e.target.value)}
-                      className="min-h-[80px]"
-                    />
-                  </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <p className="text-muted-foreground text-center py-4">No projects scheduled for this day.</p>
             )}
