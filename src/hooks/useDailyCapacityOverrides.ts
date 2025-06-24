@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -47,10 +46,6 @@ export const useDailyCapacityOverrides = (date: Date) => {
     retryDelay: 1000,
     // Don't refetch on window focus to reduce unnecessary requests
     refetchOnWindowFocus: false,
-    // Provide a fallback empty array if query fails
-    onError: (error) => {
-      console.warn('Capacity overrides query failed, falling back to default capacities:', error);
-    },
   });
 };
 
