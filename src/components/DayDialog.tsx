@@ -30,24 +30,37 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
   const [showHourAllocation, setShowHourAllocation] = React.useState(false);
   const [showCustomProject, setShowCustomProject] = React.useState(false);
   const [newProjectContext, setNewProjectContext] = React.useState<{ projectId: string; phase: string } | null>(null);
+  const [isDialogStable, setIsDialogStable] = React.useState(false);
   const upsertProjectNoteMutation = useUpsertProjectNote();
   const upsertDailyNoteMutation = useUpsertDailyNote();
   const addPhaseExceptionMutation = useAddPhaseException();
 
-  // Add debugging for custom project clicks
+  // Add debugging for dialog stability
   React.useEffect(() => {
     if (open && date) {
-      console.log('DayDialog opened for date:', format(date, 'yyyy-MM-dd'));
-      console.log('Available phases:', phases);
-      console.log('Project notes:', projectNotes);
-      console.log('Daily note:', dailyNote);
+      console.log('🚀 DayDialog opening with stable state check...');
+      console.log('Date:', format(date, 'yyyy-MM-dd'));
+      console.log('Phases count:', phases?.length || 0);
       console.log('Selected phase:', selectedPhase);
+      
+      // Add a small delay to ensure stable state
+      const timer = setTimeout(() => {
+        setIsDialogStable(true);
+        console.log('✅ Dialog marked as stable');
+      }, 100);
+
+      return () => {
+        clearTimeout(timer);
+      };
+    } else {
+      setIsDialogStable(false);
     }
-  }, [open, date, phases, projectNotes, dailyNote, selectedPhase]);
+  }, [open, date, selectedPhase]);
 
   React.useEffect(() => {
-    if (date && open) {
+    if (date && open && isDialogStable) {
       try {
+        console.log('🔄 Initializing dialog state...');
         const initialProjectNotes: Record<string, string> = {};
         
         // Safely initialize project notes
@@ -62,38 +75,57 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
         setCurrentProjectNotes(initialProjectNotes);
         setCurrentDailyNote(dailyNote?.note || '');
         
-        console.log('Initialized project notes:', initialProjectNotes);
+        console.log('✅ Dialog state initialized successfully');
       } catch (error) {
-        console.error('Error initializing dialog state:', error);
+        console.error('❌ Error initializing dialog state:', error);
         // Set safe defaults
         setCurrentProjectNotes({});
         setCurrentDailyNote('');
       }
     }
-  }, [date, projectNotes, dailyNote, open]);
+  }, [date, projectNotes, dailyNote, open, isDialogStable]);
 
-  if (!date) return null;
+  // Early return with stable check
+  if (!date || !isDialogStable) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[625px]">
+          <div className="flex items-center justify-center py-8">
+            <div className="text-muted-foreground">Loading...</div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
-  // Safely get projects for the day
+  // Safely get projects for the day with better error handling
   const projectsOnDay = React.useMemo(() => {
     try {
       if (!Array.isArray(phases)) {
-        console.warn('Phases is not an array:', phases);
+        console.warn('⚠️ Phases is not an array:', phases);
         return [];
       }
       
       const projectMap = new Map();
       phases.forEach(phase => {
         if (phase && phase.projectId && phase.projectName) {
-          projectMap.set(phase.projectId, phase);
+          // Ensure we have a complete phase object
+          const safePhase = {
+            ...phase,
+            phase: phase.phase || 'millwork', // Provide default
+            id: phase.id || `${phase.projectId}-${phase.phase}`,
+            color: phase.color || 'bg-blue-500',
+            hours: phase.hours || 0
+          };
+          projectMap.set(phase.projectId, safePhase);
         }
       });
       
       const projects = Array.from(projectMap.values());
-      console.log('Projects on day:', projects);
+      console.log('📋 Projects on day:', projects.length);
       return projects;
     } catch (error) {
-      console.error('Error getting projects for day:', error);
+      console.error('❌ Error getting projects for day:', error);
       return [];
     }
   }, [phases]);
@@ -106,6 +138,7 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
     if (!date) return;
     
     try {
+      console.log('💾 Saving notes...');
       const dateString = format(date, 'yyyy-MM-dd');
       
       const projectNotePromises = Object.entries(currentProjectNotes).map(([projectId, note]) => {
@@ -129,10 +162,11 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
         : Promise.resolve();
 
       await Promise.all([...projectNotePromises, dailyNotePromise]);
+      console.log('✅ Notes saved successfully');
       onNoteUpdate();
       onOpenChange(false);
     } catch (error) {
-      console.error('Error saving notes:', error);
+      console.error('❌ Error saving notes:', error);
     }
   };
 
@@ -140,18 +174,21 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
     if (!date) return;
     
     try {
+      console.log('🗑️ Deleting phase:', phaseToDelete);
       await addPhaseExceptionMutation.mutateAsync({
         project_id: phaseToDelete.projectId,
         phase: phaseToDelete.phase,
         date: format(date, 'yyyy-MM-dd'),
       });
+      console.log('✅ Phase deleted successfully');
       onNoteUpdate();
     } catch (error) {
-      console.error('Error deleting phase:', error);
+      console.error('❌ Error deleting phase:', error);
     }
   };
 
   const handleCustomProjectCreated = (projectId: string, phase: string) => {
+    console.log('🎯 Custom project created:', { projectId, phase });
     // Store the new project context and add a delay before opening hour allocation
     setNewProjectContext({ projectId, phase });
     
@@ -166,31 +203,40 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
 
   // Create a proper ProjectPhase object for the new project context
   const getInitialProjectPhase = (): ProjectPhase | null => {
-    if (selectedPhase) return selectedPhase;
-    
-    if (newProjectContext) {
-      // Find the project phase from the phases array
-      const projectPhase = phases.find(p => 
-        p.projectId === newProjectContext.projectId && 
-        p.phase === newProjectContext.phase
-      );
-      
-      if (projectPhase) {
-        return projectPhase;
+    try {
+      if (selectedPhase) {
+        console.log('🎯 Using selected phase:', selectedPhase);
+        return selectedPhase;
       }
       
-      // If not found in phases (newly created project), create a minimal phase object
-      const projectFromPhases = phases.find(p => p.projectId === newProjectContext.projectId);
-      if (projectFromPhases) {
-        return {
-          ...projectFromPhases,
-          phase: newProjectContext.phase as 'millwork' | 'boxConstruction' | 'stain' | 'install' | 'materialOrder',
-          id: `${newProjectContext.projectId}-${newProjectContext.phase}`,
-        };
+      if (newProjectContext) {
+        console.log('🎯 Using new project context:', newProjectContext);
+        // Find the project phase from the phases array
+        const projectPhase = phases.find(p => 
+          p.projectId === newProjectContext.projectId && 
+          p.phase === newProjectContext.phase
+        );
+        
+        if (projectPhase) {
+          return projectPhase;
+        }
+        
+        // If not found in phases (newly created project), create a minimal phase object
+        const projectFromPhases = phases.find(p => p.projectId === newProjectContext.projectId);
+        if (projectFromPhases) {
+          return {
+            ...projectFromPhases,
+            phase: newProjectContext.phase as 'millwork' | 'boxConstruction' | 'stain' | 'install' | 'materialOrder',
+            id: `${newProjectContext.projectId}-${newProjectContext.phase}`,
+          };
+        }
       }
+      
+      return null;
+    } catch (error) {
+      console.error('❌ Error getting initial project phase:', error);
+      return null;
     }
-    
-    return null;
   };
 
   const isSaving = upsertProjectNoteMutation.isPending || upsertDailyNoteMutation.isPending;
