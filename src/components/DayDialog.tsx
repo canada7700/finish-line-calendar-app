@@ -106,7 +106,7 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
   };
 
   // Create a proper ProjectPhase object for the new project context
-  const getInitialProjectPhase = () => {
+  const getInitialProjectPhase = (): ProjectPhase | null => {
     if (selectedPhase) return selectedPhase;
     
     if (newProjectContext) {
@@ -125,7 +125,7 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
       if (projectFromPhases) {
         return {
           ...projectFromPhases,
-          phase: newProjectContext.phase,
+          phase: newProjectContext.phase as 'millwork' | 'boxConstruction' | 'stain' | 'install' | 'materialOrder',
           id: `${newProjectContext.projectId}-${newProjectContext.phase}`,
         };
       }
