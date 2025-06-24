@@ -223,7 +223,12 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
           {!isLoadingHolidays ? (
             monthsToRender.map(month => (
               <div key={month.toISOString()}>
-                <MonthView monthDate={month} phases={filteredPhases} holidays={holidays} />
+                <MonthView 
+                  monthDate={month} 
+                  phases={filteredPhases} 
+                  holidays={holidays} 
+                  showCapacityView={showCapacityView}
+                />
               </div>
             ))
           ) : (

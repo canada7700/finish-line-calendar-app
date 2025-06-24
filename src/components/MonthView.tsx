@@ -20,9 +20,10 @@ interface MonthViewProps {
   monthDate: Date;
   phases: ProjectPhase[];
   holidays: Holiday[];
+  showCapacityView?: boolean;
 }
 
-const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
+const MonthView = ({ monthDate, phases, holidays, showCapacityView = false }: MonthViewProps) => {
   const [dialogState, setDialogState] = useState<{ 
     open: boolean; 
     date: Date | null; 
@@ -177,7 +178,7 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
     
     if (dayPhases.length > 0 && nonWorkingInfo.isNonWorking) {
       classes += "border-red-300 border-2 ";
-    } else if (hasCapacityIssues) {
+    } else if (hasCapacityIssues && showCapacityView) {
       classes += "border-red-400 border-2 ";
     }
     
@@ -235,8 +236,8 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
               
               // Get capacity status for this day
               const capacityStatus = capacityStatusMap.get(dateString);
-              const hasCapacityIssues = capacityStatus?.hasOverAllocation || 
-                (capacityStatus?.status === 'under-staffed' && !nonWorkingInfo.isNonWorking);
+              const hasCapacityIssues = showCapacityView && (capacityStatus?.hasOverAllocation || 
+                (capacityStatus?.status === 'under-staffed' && !nonWorkingInfo.isNonWorking));
               
               return (
                 <DroppableCalendarDay
@@ -254,14 +255,14 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
                           {format(day, 'd')}
                         </div>
                         <div className="flex items-center gap-1">
-                          {/* Capacity status indicator */}
-                          {capacityStatus && isCurrentMonth && (
+                          {/* Capacity status indicator - only show when capacity view is enabled */}
+                          {showCapacityView && capacityStatus && isCurrentMonth && (
                             <CapacityStatusIndicator status={capacityStatus} />
                           )}
                           {hasNotes && isCurrentMonth && (
                             <MessageSquare className="h-3 w-3 text-blue-500" />
                           )}
-                          {hasCapacityIssues && isCurrentMonth && (
+                          {showCapacityView && hasCapacityIssues && isCurrentMonth && (
                             <Clock className="h-3 w-3 text-orange-500" />
                           )}
                           {hasSchedulingConflict && (
