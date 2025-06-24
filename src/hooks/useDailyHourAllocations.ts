@@ -25,6 +25,7 @@ export const useDailyHourAllocations = (date?: Date) => {
       const { data, error } = await query;
 
       if (error) {
+        console.error('Error fetching hour allocations:', error);
         toast({ title: "Error fetching hour allocations", description: error.message, variant: 'destructive' });
         throw new Error(error.message);
       }
@@ -58,7 +59,6 @@ export const useDailyHourAllocations = (date?: Date) => {
         } : undefined,
       }));
     },
-    enabled: !!date,
   });
 };
 
@@ -66,6 +66,8 @@ export const useAddHourAllocation = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (allocationData: Omit<DailyHourAllocation, 'id' | 'createdAt' | 'updatedAt' | 'teamMember' | 'project'>) => {
+      console.log('Adding hour allocation:', allocationData);
+      
       const { data, error } = await supabase
         .from('daily_hour_allocations')
         .insert({
@@ -78,7 +80,12 @@ export const useAddHourAllocation = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error adding hour allocation:', error);
+        throw error;
+      }
+      
+      console.log('Successfully added hour allocation:', data);
       return data;
     },
     onSuccess: () => {
@@ -89,6 +96,7 @@ export const useAddHourAllocation = () => {
       });
     },
     onError: (error: any) => {
+      console.error('Failed to allocate hour:', error);
       toast({
         title: "Error",
         description: `Failed to allocate hour: ${error.message}`,
@@ -102,6 +110,8 @@ export const useAddHourAllocationSilent = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (allocationData: Omit<DailyHourAllocation, 'id' | 'createdAt' | 'updatedAt' | 'teamMember' | 'project'>) => {
+      console.log('Adding silent hour allocation:', allocationData);
+      
       const { data, error } = await supabase
         .from('daily_hour_allocations')
         .insert({
@@ -114,7 +124,12 @@ export const useAddHourAllocationSilent = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error in silent allocation:', error);
+        throw error;
+      }
+      
+      console.log('Successfully added silent allocation:', data);
       return data;
     },
     onSuccess: () => {
@@ -122,7 +137,6 @@ export const useAddHourAllocationSilent = () => {
       // No toast notification for silent operations
     },
     onError: (error: any) => {
-      // Still show errors for debugging
       console.error('Silent allocation error:', error);
       throw error;
     },
@@ -133,12 +147,19 @@ export const useRemoveHourAllocation = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (allocationId: string) => {
+      console.log('Removing hour allocation:', allocationId);
+      
       const { error } = await supabase
         .from('daily_hour_allocations')
         .delete()
         .eq('id', allocationId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error removing hour allocation:', error);
+        throw error;
+      }
+      
+      console.log('Successfully removed hour allocation');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['daily-hour-allocations'] });
@@ -148,6 +169,7 @@ export const useRemoveHourAllocation = () => {
       });
     },
     onError: (error: any) => {
+      console.error('Failed to remove hour allocation:', error);
       toast({
         title: "Error",
         description: `Failed to remove hour allocation: ${error.message}`,

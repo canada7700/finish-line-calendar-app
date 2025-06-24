@@ -16,22 +16,22 @@ export interface DailyCapacityStatus {
 export const useDailyCapacityStatus = (startDate: Date, endDate: Date) => {
   const { data: capacities = [] } = useDailyPhaseCapacities();
   
-  // Get all allocations for the date range
-  const days = eachDayOfInterval({ start: startDate, end: endDate });
+  // Get all allocations for the entire date range in one query
+  const { data: allAllocations = [] } = useDailyHourAllocations();
   
-  // Create queries for each day (this could be optimized with a single range query)
-  const allocationQueries = days.map(day => {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    const { data: allocations = [] } = useDailyHourAllocations(day);
-    return { date: format(day, 'yyyy-MM-dd'), allocations };
-  });
+  // Get all days in the range
+  const days = eachDayOfInterval({ start: startDate, end: endDate });
 
   const capacityStatus = useMemo(() => {
     const statusMap = new Map<string, DailyCapacityStatus>();
 
-    allocationQueries.forEach(({ date, allocations }) => {
-      const dayDate = new Date(date);
-      const { capacityInfo, hasOverAllocation, totalAllocated } = useDayCapacityInfo(dayDate, allocations, capacities);
+    days.forEach(day => {
+      const dateString = format(day, 'yyyy-MM-dd');
+      
+      // Filter allocations for this specific date
+      const dayAllocations = allAllocations.filter(alloc => alloc.date === dateString);
+      
+      const { capacityInfo, hasOverAllocation, totalAllocated } = useDayCapacityInfo(day, dayAllocations, capacities);
       
       const totalCapacity = capacityInfo.reduce((sum, info) => sum + info.capacity, 0);
       
@@ -54,8 +54,8 @@ export const useDailyCapacityStatus = (startDate: Date, endDate: Date) => {
         }
       }
 
-      statusMap.set(date, {
-        date,
+      statusMap.set(dateString, {
+        date: dateString,
         totalAllocated,
         totalCapacity,
         utilizationPercent,
@@ -65,7 +65,7 @@ export const useDailyCapacityStatus = (startDate: Date, endDate: Date) => {
     });
 
     return statusMap;
-  }, [allocationQueries, capacities]);
+  }, [days, allAllocations, capacities]);
 
   return capacityStatus;
 };

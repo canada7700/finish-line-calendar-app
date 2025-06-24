@@ -168,7 +168,10 @@ const HourAllocationDialog = ({ date, phases, initialProjectPhase, open, onOpenC
   };
 
   const handleAutoFill = async () => {
+    console.log('🚀 Starting auto-fill process...');
+    
     if (!selectedProject || !selectedPhase) {
+      console.log('❌ Auto-fill failed: Missing project or phase');
       toast({ title: "Missing Information", description: "Please select project and phase first", variant: "destructive" });
       return;
     }
@@ -176,12 +179,21 @@ const HourAllocationDialog = ({ date, phases, initialProjectPhase, open, onOpenC
     const eligibleMembers = getEligibleTeamMembers(selectedPhase);
     const phaseCapacity = capacities.find(c => c.phase === selectedPhase);
     
+    console.log('📋 Auto-fill setup:', {
+      eligibleMembers: eligibleMembers.length,
+      phaseCapacity: phaseCapacity?.maxHours,
+      selectedProject,
+      selectedPhase
+    });
+    
     if (eligibleMembers.length === 0) {
+      console.log('❌ Auto-fill failed: No eligible members');
       toast({ title: "No Eligible Members", description: "No team members are eligible for this phase", variant: "destructive" });
       return;
     }
 
     if (!phaseCapacity) {
+      console.log('❌ Auto-fill failed: No capacity set');
       toast({ title: "No Capacity Set", description: "No capacity limit set for this phase", variant: "destructive" });
       return;
     }
@@ -193,7 +205,14 @@ const HourAllocationDialog = ({ date, phases, initialProjectPhase, open, onOpenC
 
     const remainingCapacity = phaseCapacity.maxHours - currentPhaseAllocations;
     
+    console.log('📊 Capacity analysis:', {
+      currentAllocations: currentPhaseAllocations,
+      maxCapacity: phaseCapacity.maxHours,
+      remainingCapacity
+    });
+    
     if (remainingCapacity <= 0) {
+      console.log('❌ Auto-fill failed: Capacity full');
       toast({ title: "Capacity Full", description: "Phase capacity is already at maximum", variant: "destructive" });
       return;
     }
@@ -209,14 +228,20 @@ const HourAllocationDialog = ({ date, phases, initialProjectPhase, open, onOpenC
       // Extended to 9 hours: 8 AM to 5 PM
       const hourBlocks = Array.from({ length: 9 }, (_, i) => i + 8);
 
+      console.log('⏰ Available hour blocks:', hourBlocks);
+
       // Fill one person completely before moving to the next
       for (const member of eligibleMembers) {
         if (allocationsAdded >= remainingCapacity) break;
+        
+        console.log(`👤 Processing member: ${member.name}`);
         
         // Get current allocations for this member on this date (any project/phase)
         let memberCurrentAllocations = allocations.filter(alloc => 
           alloc.teamMemberId === member.id
         ).length;
+        
+        console.log(`📝 Member ${member.name} current allocations: ${memberCurrentAllocations}`);
         
         // Fill this member's day (up to 9 hours max) before moving to next member
         for (const hour of hourBlocks) {
@@ -231,6 +256,8 @@ const HourAllocationDialog = ({ date, phases, initialProjectPhase, open, onOpenC
           
           if (!isAlreadyAllocated) {
             try {
+              console.log(`⏱️ Allocating hour ${hour} to ${member.name}`);
+              
               await addAllocationSilentMutation.mutateAsync({
                 projectId: selectedProject,
                 teamMemberId: member.id,
@@ -242,17 +269,25 @@ const HourAllocationDialog = ({ date, phases, initialProjectPhase, open, onOpenC
               memberCurrentAllocations++;
               allocationsAdded++;
               setAutoFillProgress(allocationsAdded);
+              
+              console.log(`✅ Successfully allocated hour ${hour} to ${member.name} (${allocationsAdded}/${remainingCapacity})`);
             } catch (error: any) {
+              console.error(`❌ Failed to allocate hour ${hour} to ${member.name}:`, error);
+              
               // If we hit a double-booking constraint error, skip this allocation
               if (error.message?.includes('duplicate key value') || error.message?.includes('unique constraint')) {
-                console.warn(`Skipping double-booking for ${member.name} at hour ${hour}`);
+                console.warn(`⚠️ Skipping double-booking for ${member.name} at hour ${hour}`);
                 continue;
               }
               throw error;
             }
+          } else {
+            console.log(`⏭️ Skipping hour ${hour} for ${member.name} - already allocated`);
           }
         }
       }
+
+      console.log(`🎉 Auto-fill completed: ${allocationsAdded} allocations added`);
 
       toast({
         title: "Auto-Fill Complete",
@@ -265,12 +300,12 @@ const HourAllocationDialog = ({ date, phases, initialProjectPhase, open, onOpenC
       setSelectedTeamMembers([]);
       setSelectedHourBlocks([]);
     } catch (error) {
+      console.error('💥 Auto-fill error:', error);
       toast({
         title: "Auto-Fill Error",
-        description: "Failed to complete auto-fill operation",
+        description: "Failed to complete auto-fill operation. Please check the console for details.",
         variant: "destructive",
       });
-      console.error('Auto-fill error:', error);
     } finally {
       setIsAutoFilling(false);
       setAutoFillProgress(0);
