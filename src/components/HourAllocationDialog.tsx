@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -462,261 +461,268 @@ const HourAllocationDialog = ({ date, phases, initialProjectPhase, open, onOpenC
           </TabsContent>
 
           <TabsContent value="assign" className="space-y-4">
-            {/* Auto-Fill Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Quick Auto-Fill</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium">Project</label>
-                    <Select value={selectedProject} onValueChange={setSelectedProject} disabled={isAutoFilling}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select project" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableProjects.map((project) => (
-                          <SelectItem key={project.id} value={project.id}>
-                            {project.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+            {/* Side-by-side layout for Auto-Fill and Manual Assignment */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Auto-Fill Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Quick Auto-Fill</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium">Project</label>
+                      <Select value={selectedProject} onValueChange={setSelectedProject} disabled={isAutoFilling}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select project" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableProjects.map((project) => (
+                            <SelectItem key={project.id} value={project.id}>
+                              {project.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-medium">Phase</label>
+                      <Select value={selectedPhase} onValueChange={setSelectedPhase} disabled={!selectedProject || isAutoFilling}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select phase" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availablePhases.map((phase) => (
+                            <SelectItem key={phase} value={phase}>
+                              {phase.charAt(0).toUpperCase() + phase.slice(1)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   
-                  <div>
-                    <label className="text-sm font-medium">Phase</label>
-                    <Select value={selectedPhase} onValueChange={setSelectedPhase} disabled={!selectedProject || isAutoFilling}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select phase" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availablePhases.map((phase) => (
-                          <SelectItem key={phase} value={phase}>
-                            {phase.charAt(0).toUpperCase() + phase.slice(1)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                
-                {selectedPhase && (
-                  <div className="p-3 bg-muted/50 rounded-lg">
-                    <div className="text-sm font-medium mb-2">
-                      Eligible Team Members ({eligibleMembers.length})
+                  {selectedPhase && (
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <div className="text-sm font-medium mb-2">
+                        Eligible Team Members ({eligibleMembers.length})
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {eligibleMembers.map(member => member.name).join(', ') || 'None available'}
+                      </div>
                     </div>
-                    <div className="text-sm text-muted-foreground">
-                      {eligibleMembers.map(member => member.name).join(', ') || 'None available'}
-                    </div>
-                  </div>
-                )}
-                
-                <Button 
-                  onClick={handleAutoFill} 
-                  disabled={!selectedProject || !selectedPhase || eligibleMembers.length === 0 || isAutoFilling}
-                  className="w-full"
-                >
-                  {isAutoFilling ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Auto-Filling... ({autoFillProgress}/{autoFillTotal})
-                    </>
-                  ) : (
-                    <>
-                      <Wand2 className="h-4 w-4 mr-2" />
-                      Auto-Fill to Phase Capacity with Eligible Members
-                    </>
                   )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Manual Assignment */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Manual Hour Allocation</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium">Project</label>
-                    <Select value={selectedProject} onValueChange={setSelectedProject}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select project" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableProjects.map((project) => (
-                          <SelectItem key={project.id} value={project.id}>
-                            {project.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
                   
-                  <div>
-                    <label className="text-sm font-medium">Phase</label>
-                    <Select value={selectedPhase} onValueChange={setSelectedPhase} disabled={!selectedProject}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select phase" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availablePhases.map((phase) => (
-                          <SelectItem key={phase} value={phase}>
-                            {phase.charAt(0).toUpperCase() + phase.slice(1)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                
-                {/* Multi-Select Team Members */}
-                {selectedPhase && (
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="text-sm font-medium">Team Members</label>
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={handleSelectAllEligibleMembers}
-                          disabled={eligibleMembers.length === 0}
-                        >
-                          <CheckSquare className="h-3 w-3 mr-1" />
-                          Select All Eligible
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={handleClearTeamMemberSelection}
-                          disabled={selectedTeamMembers.length === 0}
-                        >
-                          <Square className="h-3 w-3 mr-1" />
-                          Clear Selection
-                        </Button>
-                      </div>
+                  <Button 
+                    onClick={handleAutoFill} 
+                    disabled={!selectedProject || !selectedPhase || eligibleMembers.length === 0 || isAutoFilling}
+                    className="w-full"
+                  >
+                    {isAutoFilling ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Auto-Filling... ({autoFillProgress}/{autoFillTotal})
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 className="h-4 w-4 mr-2" />
+                        Auto-Fill to Phase Capacity
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Manual Assignment */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Manual Hour Allocation</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium">Project</label>
+                      <Select value={selectedProject} onValueChange={setSelectedProject}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select project" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableProjects.map((project) => (
+                            <SelectItem key={project.id} value={project.id}>
+                              {project.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     
-                    {/* Selected Team Members Display */}
-                    {selectedTeamMembers.length > 0 && (
-                      <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                        <div className="text-sm font-medium mb-2">
-                          Selected ({selectedTeamMembers.length} members):
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {selectedTeamMembers.map((memberId) => {
-                            const member = teamMembers?.find(m => m.id === memberId);
-                            return (
-                              <Badge key={memberId} variant="secondary" className="flex items-center gap-1">
-                                {member?.name}
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleRemoveTeamMember(memberId)}
-                                  className="h-4 w-4 p-0 hover:bg-transparent"
-                                >
-                                  <X className="h-3 w-3" />
-                                </Button>
-                              </Badge>
-                            );
-                          })}
+                    <div>
+                      <label className="text-sm font-medium">Phase</label>
+                      <Select value={selectedPhase} onValueChange={setSelectedPhase} disabled={!selectedProject}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select phase" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availablePhases.map((phase) => (
+                            <SelectItem key={phase} value={phase}>
+                              {phase.charAt(0).toUpperCase() + phase.slice(1)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  
+                  {/* Multi-Select Team Members */}
+                  {selectedPhase && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-medium">Team Members</label>
+                        <div className="flex gap-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleSelectAllEligibleMembers}
+                            disabled={eligibleMembers.length === 0}
+                            className="text-xs px-2 py-1 h-7"
+                          >
+                            <CheckSquare className="h-3 w-3 mr-1" />
+                            All
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleClearTeamMemberSelection}
+                            disabled={selectedTeamMembers.length === 0}
+                            className="text-xs px-2 py-1 h-7"
+                          >
+                            <Square className="h-3 w-3 mr-1" />
+                            Clear
+                          </Button>
                         </div>
                       </div>
-                    )}
-                    
-                    {/* Team Member Checkboxes */}
-                    <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3">
-                      {teamMembers?.filter(member => member.isActive).map((member) => {
-                        const isEligible = eligibleMembers.some(em => em.id === member.id);
-                        const isSelected = selectedTeamMembers.includes(member.id);
-                        
-                        return (
-                          <div key={member.id} className="flex items-center space-x-2">
+                      
+                      {/* Selected Team Members Display */}
+                      {selectedTeamMembers.length > 0 && (
+                        <div className="p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                          <div className="text-xs font-medium mb-1">
+                            Selected ({selectedTeamMembers.length}):
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {selectedTeamMembers.map((memberId) => {
+                              const member = teamMembers?.find(m => m.id === memberId);
+                              return (
+                                <Badge key={memberId} variant="secondary" className="text-xs flex items-center gap-1">
+                                  {member?.name}
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRemoveTeamMember(memberId)}
+                                    className="h-3 w-3 p-0 hover:bg-transparent"
+                                  >
+                                    <X className="h-2 w-2" />
+                                  </Button>
+                                </Badge>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Team Member Checkboxes - Compact */}
+                      <div className="grid grid-cols-1 gap-1 max-h-32 overflow-y-auto border border-gray-200 rounded-lg p-2">
+                        {teamMembers?.filter(member => member.isActive).map((member) => {
+                          const isEligible = eligibleMembers.some(em => em.id === member.id);
+                          const isSelected = selectedTeamMembers.includes(member.id);
+                          
+                          return (
+                            <div key={member.id} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`member-${member.id}`}
+                                checked={isSelected}
+                                onCheckedChange={(checked) => handleTeamMemberToggle(member.id, checked as boolean)}
+                                disabled={!isEligible}
+                              />
+                              <label
+                                htmlFor={`member-${member.id}`}
+                                className={`text-xs cursor-pointer ${
+                                  !isEligible ? 'text-muted-foreground' : ''
+                                }`}
+                              >
+                                {member.name} {!isEligible && '(Not eligible)'}
+                              </label>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {selectedTeamMembers.length > 0 && selectedProject && selectedPhase && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-medium">Hour Blocks</label>
+                        <div className="flex gap-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleSelectAllAvailable}
+                            disabled={availableHourBlocks.every(block => block.isAlreadyAllocated)}
+                            className="text-xs px-2 py-1 h-7"
+                          >
+                            <CheckSquare className="h-3 w-3 mr-1" />
+                            All
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleClearSelection}
+                            disabled={selectedHourBlocks.length === 0}
+                            className="text-xs px-2 py-1 h-7"
+                          >
+                            <Square className="h-3 w-3 mr-1" />
+                            Clear
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-1">
+                        {availableHourBlocks.map((block) => (
+                          <div key={block.hour} className="flex items-center space-x-2">
                             <Checkbox
-                              id={`member-${member.id}`}
-                              checked={isSelected}
-                              onCheckedChange={(checked) => handleTeamMemberToggle(member.id, checked as boolean)}
-                              disabled={!isEligible}
+                              id={`hour-${block.hour}`}
+                              checked={selectedHourBlocks.includes(block.hour)}
+                              onCheckedChange={(checked) => handleHourBlockToggle(block.hour, checked as boolean)}
+                              disabled={block.isAlreadyAllocated}
                             />
                             <label
-                              htmlFor={`member-${member.id}`}
-                              className={`text-sm cursor-pointer ${
-                                !isEligible ? 'text-muted-foreground' : ''
-                              }`}
+                              htmlFor={`hour-${block.hour}`}
+                              className={`text-xs ${block.isAlreadyAllocated ? 'text-muted-foreground line-through' : 'cursor-pointer'}`}
                             >
-                              {member.name} {!isEligible && '(Not eligible)'}
+                              {block.hour}:00
                             </label>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                
-                {selectedTeamMembers.length > 0 && selectedProject && selectedPhase && (
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="text-sm font-medium">Hour Blocks</label>
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={handleSelectAllAvailable}
-                          disabled={availableHourBlocks.every(block => block.isAlreadyAllocated)}
-                        >
-                          <CheckSquare className="h-3 w-3 mr-1" />
-                          Select All Available
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={handleClearSelection}
-                          disabled={selectedHourBlocks.length === 0}
-                        >
-                          <Square className="h-3 w-3 mr-1" />
-                          Clear Selection
-                        </Button>
+                        ))}
                       </div>
                     </div>
-                    
-                    <div className="grid grid-cols-3 gap-2">
-                      {availableHourBlocks.map((block) => (
-                        <div key={block.hour} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`hour-${block.hour}`}
-                            checked={selectedHourBlocks.includes(block.hour)}
-                            onCheckedChange={(checked) => handleHourBlockToggle(block.hour, checked as boolean)}
-                            disabled={block.isAlreadyAllocated}
-                          />
-                          <label
-                            htmlFor={`hour-${block.hour}`}
-                            className={`text-sm ${block.isAlreadyAllocated ? 'text-muted-foreground line-through' : 'cursor-pointer'}`}
-                          >
-                            {block.hour}:00 {block.isAlreadyAllocated && '(Conflicts)'}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                <Button 
-                  onClick={handleAddAllocations} 
-                  disabled={!selectedProject || !selectedPhase || selectedTeamMembers.length === 0 || selectedHourBlocks.length === 0 || addAllocationMutation.isPending}
-                  className="w-full"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Selected Allocations ({selectedTeamMembers.length} members × {selectedHourBlocks.length} hours)
-                </Button>
-              </CardContent>
-            </Card>
+                  )}
+                  
+                  <Button 
+                    onClick={handleAddAllocations} 
+                    disabled={!selectedProject || !selectedPhase || selectedTeamMembers.length === 0 || selectedHourBlocks.length === 0 || addAllocationMutation.isPending}
+                    className="w-full"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Allocations ({selectedTeamMembers.length} × {selectedHourBlocks.length})
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="allocations" className="space-y-4">
