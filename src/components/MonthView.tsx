@@ -10,9 +10,11 @@ import { usePhaseExceptions } from '@/hooks/usePhaseExceptions';
 import { useDailyHourAllocations } from '@/hooks/useDailyHourAllocations';
 import { useDailyPhaseCapacities, useDayCapacityInfo } from '@/hooks/useDailyCapacities';
 import { useProjectRescheduling } from '@/hooks/useProjectRescheduling';
+import { useDailyCapacityStatus } from '@/hooks/useDailyCapacityStatus';
 import DayDialog from './DayDialog';
 import DraggableProjectPhase from './DraggableProjectPhase';
 import DroppableCalendarDay from './DroppableCalendarDay';
+import CapacityStatusIndicator from './CapacityStatusIndicator';
 
 interface MonthViewProps {
   monthDate: Date;
@@ -39,6 +41,9 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
   const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+  
+  // Get capacity status for the entire calendar range
+  const capacityStatusMap = useDailyCapacityStatus(calendarStart, calendarEnd);
   
   const holidaysMap = useMemo(() => new Map(holidays.map(h => [h.date, h.name])), [holidays]);
   
@@ -228,7 +233,10 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
               const dayDailyNote = dailyNotesByDate.get(dateString);
               const hasNotes = dayProjectNotes.some(n => n.note) || (dayDailyNote && dayDailyNote.note);
               
-              const hasCapacityIssues = false;
+              // Get capacity status for this day
+              const capacityStatus = capacityStatusMap.get(dateString);
+              const hasCapacityIssues = capacityStatus?.hasOverAllocation || 
+                (capacityStatus?.status === 'under-staffed' && !nonWorkingInfo.isNonWorking);
               
               return (
                 <DroppableCalendarDay
@@ -246,6 +254,10 @@ const MonthView = ({ monthDate, phases, holidays }: MonthViewProps) => {
                           {format(day, 'd')}
                         </div>
                         <div className="flex items-center gap-1">
+                          {/* Capacity status indicator */}
+                          {capacityStatus && isCurrentMonth && (
+                            <CapacityStatusIndicator status={capacityStatus} />
+                          )}
                           {hasNotes && isCurrentMonth && (
                             <MessageSquare className="h-3 w-3 text-blue-500" />
                           )}

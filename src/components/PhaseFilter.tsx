@@ -1,188 +1,164 @@
 
-import { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { ChevronDown, Filter } from 'lucide-react';
+import { X, Eye, EyeOff } from 'lucide-react';
 import { ProjectPhase } from '@/types/project';
 
 interface PhaseFilterProps {
   phases: ProjectPhase[];
   onFilterChange: (selectedPhases: string[]) => void;
+  showCapacityView?: boolean;
+  onCapacityViewToggle?: (show: boolean) => void;
 }
 
-const PHASE_CONFIG = {
-  all: { label: 'All', color: 'bg-gray-500' },
-  materialOrder: { label: 'Material Order', color: 'bg-orange-500' },
-  millwork: { label: 'Millwork', color: 'bg-purple-500' },
-  boxConstruction: { label: 'Box Construction', color: 'bg-blue-500' },
-  stain: { label: 'Stain', color: 'bg-amber-500' },
-  install: { label: 'Install', color: 'bg-green-500' }
-};
+const PhaseFilter = ({ 
+  phases, 
+  onFilterChange, 
+  showCapacityView = false, 
+  onCapacityViewToggle 
+}: PhaseFilterProps) => {
+  const [selectedPhases, setSelectedPhases] = React.useState<string[]>(['all']);
 
-export const PhaseFilter = ({ phases, onFilterChange }: PhaseFilterProps) => {
-  const [selectedPhases, setSelectedPhases] = useState<string[]>(['all']);
-
-  // Get counts for each phase
-  const phaseCounts = phases.reduce((acc, phase) => {
-    acc[phase.phase] = (acc[phase.phase] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  const uniquePhases = React.useMemo(() => {
+    const phaseSet = new Set(phases.map(p => p.phase));
+    return Array.from(phaseSet);
+  }, [phases]);
 
   const handlePhaseToggle = (phase: string) => {
     let newSelectedPhases: string[];
     
     if (phase === 'all') {
-      newSelectedPhases = ['all'];
+      newSelectedPhases = selectedPhases.includes('all') ? [] : ['all'];
+    } else if (phase === 'none') {
+      newSelectedPhases = [];
     } else {
-      // Remove 'all' if it's selected and we're selecting a specific phase
-      let filteredSelected = selectedPhases.filter(p => p !== 'all');
+      // Remove 'all' if it's selected when selecting individual phases
+      const filteredSelected = selectedPhases.filter(p => p !== 'all');
       
       if (filteredSelected.includes(phase)) {
-        // Remove the phase
-        filteredSelected = filteredSelected.filter(p => p !== phase);
-        // Allow empty selection - don't force back to 'all'
+        newSelectedPhases = filteredSelected.filter(p => p !== phase);
       } else {
-        // Add the phase
-        filteredSelected = [...filteredSelected, phase];
+        newSelectedPhases = [...filteredSelected, phase];
       }
       
-      newSelectedPhases = filteredSelected;
+      // If all individual phases are selected, switch to 'all'
+      if (newSelectedPhases.length === uniquePhases.length) {
+        newSelectedPhases = ['all'];
+      }
     }
     
     setSelectedPhases(newSelectedPhases);
     onFilterChange(newSelectedPhases);
   };
 
-  const clearAll = () => {
-    setSelectedPhases([]);
-    onFilterChange([]);
-  };
-
-  const selectAll = () => {
+  const clearFilters = () => {
     setSelectedPhases(['all']);
     onFilterChange(['all']);
   };
 
-  const isSelected = (phase: string) => {
-    if (phase === 'none') {
-      return selectedPhases.length === 0;
-    }
-    return selectedPhases.includes('all') || selectedPhases.includes(phase);
+  const getPhaseColor = (phase: string) => {
+    const samplePhase = phases.find(p => p.phase === phase);
+    return samplePhase?.color || 'bg-gray-500';
   };
 
-  const getFilterButtonText = () => {
-    if (selectedPhases.includes('all')) {
-      return 'All Phases';
+  const getPhaseDisplayName = (phase: string) => {
+    switch (phase) {
+      case 'millwork':
+        return 'Millwork';
+      case 'boxConstruction':
+        return 'Box Construction';
+      case 'stain':
+        return 'Stain';
+      case 'install':
+        return 'Install';
+      case 'materialOrder':
+        return 'Material Order';
+      default:
+        return phase;
     }
-    if (selectedPhases.length === 0) {
-      return 'No phases selected';
-    }
-    if (selectedPhases.length === 1) {
-      const phase = selectedPhases[0];
-      return PHASE_CONFIG[phase as keyof typeof PHASE_CONFIG]?.label || phase;
-    }
-    return `${selectedPhases.length} phases selected`;
   };
 
   return (
-    <div className="sticky top-0 z-10 bg-background border-b border-border p-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium">Project Timeline</h3>
+    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 bg-muted/30 border-b">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-medium text-muted-foreground mr-2">Phases:</span>
         
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="flex items-center gap-2">
-              <Filter className="h-4 w-4" />
-              {getFilterButtonText()}
-              <ChevronDown className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-64 bg-background">
-            <DropdownMenuLabel>Filter by Phase</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            
-            <DropdownMenuItem 
-              onSelect={(e) => e.preventDefault()}
-              onClick={(e) => {
-                e.stopPropagation();
-                selectAll();
-              }}
-              className="cursor-pointer"
-            >
-              <Checkbox
-                checked={selectedPhases.includes('all')}
-                className="mr-2"
-              />
-              <div className={`w-3 h-3 rounded mr-2 ${PHASE_CONFIG.all.color}`} />
-              <span className="flex-1">All Phases</span>
-              <Badge variant="secondary" className="ml-2">
-                {phases.length}
-              </Badge>
-            </DropdownMenuItem>
-            
-            <DropdownMenuItem 
-              onSelect={(e) => e.preventDefault()}
-              onClick={(e) => {
-                e.stopPropagation();
-                clearAll();
-              }}
-              className="cursor-pointer"
-            >
-              <Checkbox
-                checked={isSelected('none')}
-                className="mr-2"
-              />
-              <span className="ml-5">None</span>
-            </DropdownMenuItem>
-
-            <DropdownMenuSeparator />
-
-            {Object.entries(PHASE_CONFIG).map(([phaseKey, config]) => {
-              if (phaseKey === 'all') return null;
-              
-              const count = phaseCounts[phaseKey] || 0;
-              if (count === 0) return null;
-              
-              return (
-                <DropdownMenuItem
-                  key={phaseKey}
-                  onSelect={(e) => e.preventDefault()}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handlePhaseToggle(phaseKey);
-                  }}
-                  className="cursor-pointer"
-                >
-                  <Checkbox
-                    checked={isSelected(phaseKey)}
-                    className="mr-2"
-                  />
-                  <div className={`w-3 h-3 rounded mr-2 ${config.color}`} />
-                  <span className="flex-1">{config.label}</span>
-                  <Badge variant="secondary" className="ml-2">
-                    {count}
-                  </Badge>
-                </DropdownMenuItem>
-              );
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <Button
+          variant={selectedPhases.includes('all') ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => handlePhaseToggle('all')}
+          className="h-7"
+        >
+          All
+        </Button>
+        
+        <Button
+          variant={selectedPhases.length === 0 ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => handlePhaseToggle('none')}
+          className="h-7"
+        >
+          None
+        </Button>
+        
+        {uniquePhases.map(phase => (
+          <Button
+            key={phase}
+            variant={selectedPhases.includes(phase) ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => handlePhaseToggle(phase)}
+            className="h-7"
+          >
+            <div className={`w-3 h-3 rounded-full ${getPhaseColor(phase)} mr-2`} />
+            {getPhaseDisplayName(phase)}
+          </Button>
+        ))}
+        
+        {selectedPhases.length > 0 && !selectedPhases.includes('all') && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearFilters}
+            className="h-7 px-2"
+          >
+            <X className="h-3 w-3" />
+          </Button>
+        )}
       </div>
-      
+
+      {onCapacityViewToggle && (
+        <div className="flex items-center gap-2 ml-auto">
+          <Button
+            variant={showCapacityView ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => onCapacityViewToggle(!showCapacityView)}
+            className="h-7"
+          >
+            {showCapacityView ? <Eye className="h-3 w-3 mr-2" /> : <EyeOff className="h-3 w-3 mr-2" />}
+            Capacity View
+          </Button>
+        </div>
+      )}
+
       {selectedPhases.length > 0 && !selectedPhases.includes('all') && (
-        <div className="text-sm text-muted-foreground mt-2">
-          Showing {selectedPhases.length} phase type{selectedPhases.length !== 1 ? 's' : ''}
+        <div className="flex flex-wrap gap-1">
+          {selectedPhases.map(phase => (
+            <Badge key={phase} variant="secondary" className="text-xs">
+              <div className={`w-2 h-2 rounded-full ${getPhaseColor(phase)} mr-1`} />
+              {getPhaseDisplayName(phase)}
+              <button
+                onClick={() => handlePhaseToggle(phase)}
+                className="ml-1 hover:bg-muted-foreground/20 rounded-full p-0.5"
+              >
+                <X className="h-2 w-2" />
+              </button>
+            </Badge>
+          ))}
         </div>
       )}
     </div>
   );
 };
+
+export { PhaseFilter };

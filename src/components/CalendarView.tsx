@@ -28,6 +28,7 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
   const [activePhase, setActivePhase] = useState<ProjectPhase | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [selectedPhases, setSelectedPhases] = useState<string[]>(['all']);
+  const [showCapacityView, setShowCapacityView] = useState(false);
   
   const { holidays, isLoading: isLoadingHolidays } = useHolidays();
   const { rescheduleProject, isRescheduling, applyPendingUpdates } = useProjectRescheduling(isDragging);
@@ -49,6 +50,10 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
 
   const handleFilterChange = (newSelectedPhases: string[]) => {
     setSelectedPhases(newSelectedPhases);
+  };
+
+  const handleCapacityViewToggle = (show: boolean) => {
+    setShowCapacityView(show);
   };
 
   // Auto-scroll to current month on initial load only
@@ -176,7 +181,12 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="h-full flex flex-col">
-        <PhaseFilter phases={phases} onFilterChange={handleFilterChange} />
+        <PhaseFilter 
+          phases={phases} 
+          onFilterChange={handleFilterChange}
+          showCapacityView={showCapacityView}
+          onCapacityViewToggle={handleCapacityViewToggle}
+        />
         
         <div 
           ref={scrollContainerRef}
@@ -191,6 +201,12 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
                 Use the "Recalculate Dates" button on a project to ensure it follows this rule.
                 <br />
                 <strong>Drag install phases (marked with blue dots) to reschedule entire projects.</strong>
+                {showCapacityView && (
+                  <>
+                    <br />
+                    <strong>Capacity indicators:</strong> Green = fully staffed, Yellow = partially staffed, Orange = under-staffed, Red = over-allocated
+                  </>
+                )}
               </div>
             </div>
           </div>
