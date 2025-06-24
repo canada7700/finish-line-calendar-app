@@ -47,6 +47,29 @@ export const useProjects = () => {
     }
   });
 
+  // Clean up old custom projects (older than 7 days)
+  const cleanupOldCustomProjects = useMutation({
+    mutationFn: async () => {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('status', 'custom')
+        .lt('created_at', sevenDaysAgo.toISOString());
+
+      if (error) {
+        console.error('Error cleaning up old custom projects:', error);
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      console.log('Old custom projects cleaned up successfully');
+    }
+  });
+
   // Add project mutation
   const addProjectMutation = useMutation({
     mutationFn: async (projectData: Omit<Project, 'id'>) => {
@@ -152,10 +175,22 @@ export const useProjects = () => {
     }
   });
 
-  // Delete project mutation
+  // Delete project mutation - enhanced for custom projects
   const deleteProjectMutation = useMutation({
     mutationFn: async (projectId: string) => {
       console.log('Deleting project:', projectId);
+      
+      // First delete related data (notes, allocations, exceptions)
+      const deletePromises = [
+        supabase.from('project_notes').delete().eq('project_id', projectId),
+        supabase.from('daily_hour_allocations').delete().eq('project_id', projectId),
+        supabase.from('project_phase_exceptions').delete().eq('project_id', projectId),
+        supabase.from('project_assignments').delete().eq('project_id', projectId)
+      ];
+
+      await Promise.all(deletePromises);
+
+      // Then delete the project
       const { error } = await supabase
         .from('projects')
         .delete()
@@ -166,13 +201,14 @@ export const useProjects = () => {
         throw error;
       }
 
-      console.log('Project deleted successfully');
+      console.log('Project and related data deleted successfully');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['project-phases'] });
       toast({
         title: "Project Deleted",
-        description: "Project has been deleted successfully.",
+        description: "Project and all related data have been deleted successfully.",
       });
     },
     onError: (error) => {
@@ -184,6 +220,15 @@ export const useProjects = () => {
       });
     }
   });
+
+  // Auto-cleanup old custom projects on component mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      cleanupOldCustomProjects.mutate();
+    }, 1000); // Delay to let initial queries complete
+
+    return () => clearTimeout(timer);
+  }, []);
 
   return {
     projects,
@@ -198,6 +243,8 @@ export const useProjects = () => {
     },
     isUpdatingProject: updateProjectMutation.isPending,
     deleteProject: deleteProjectMutation.mutate,
-    isDeletingProject: deleteProjectMutation.isPending
+    isDeletingProject: deleteProjectMutation.isPending,
+    cleanupOldCustomProjects: cleanupOldCustomProjects.mutate,
+    isCleaningUp: cleanupOldCustomProjects.isPending
   };
 };

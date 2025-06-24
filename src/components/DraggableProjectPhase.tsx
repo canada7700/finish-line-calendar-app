@@ -48,12 +48,13 @@ const DraggableProjectPhase = ({
   const isDraggablePhase = phase.phase === 'install' && isLastInstallDay;
 
   const handleClick = (event: React.MouseEvent) => {
-    // Call the phase click handler if provided
+    // Always allow clicking on phases - this fixes the custom project interaction issue
     if (onPhaseClick) {
       onPhaseClick(event);
     }
   };
 
+  // For non-draggable phases (including custom projects), just return a clickable div
   if (!isDraggablePhase) {
     return (
       <div onClick={handleClick} className="cursor-pointer">
@@ -62,6 +63,7 @@ const DraggableProjectPhase = ({
     );
   }
 
+  // For draggable phases, use the full drag functionality
   return (
     <div
       ref={setNodeRef}
@@ -71,11 +73,11 @@ const DraggableProjectPhase = ({
       onClick={handleClick}
       className={`
         ${isDragging ? 'opacity-50 z-50' : ''} 
-        ${isDraggablePhase && !isRescheduling ? 'cursor-grab active:cursor-grabbing' : ''}
+        ${isDraggablePhase && !isRescheduling ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}
         ${isRescheduling ? 'cursor-not-allowed opacity-75' : ''}
         transition-opacity duration-200 relative
       `}
-      title={`${isRescheduling ? 'Updating project...' : `Drag to reschedule ${phase.projectName}`}${hasSchedulingConflict ? ` - CONFLICT: ${conflictReason}` : ''}`}
+      title={`${isRescheduling ? 'Updating project...' : `${isDraggablePhase ? 'Drag to reschedule' : 'Click to view details'} ${phase.projectName}`}${hasSchedulingConflict ? ` - CONFLICT: ${conflictReason}` : ''}`}
     >
       {children}
       {isDraggablePhase && (

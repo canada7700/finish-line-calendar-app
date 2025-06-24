@@ -8,8 +8,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { useUpsertNote as useUpsertProjectNote } from '@/hooks/useProjectNotes';
 import { useUpsertDailyNote } from '@/hooks/useDailyNotes';
 import { useAddPhaseException } from '@/hooks/usePhaseExceptions';
-import { AlertTriangle, Trash2, Clock, Plus } from 'lucide-react';
+import { useProjects } from '@/hooks/useProjects';
+import { AlertTriangle, Trash2, Clock, Plus, X } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import HourAllocationDialog from './HourAllocationDialog';
 import CustomProjectDialog from './CustomProjectDialog';
 
@@ -35,6 +37,7 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
   const upsertProjectNoteMutation = useUpsertProjectNote();
   const upsertDailyNoteMutation = useUpsertDailyNote();
   const addPhaseExceptionMutation = useAddPhaseException();
+  const { deleteProject, isDeletingProject } = useProjects();
 
   // Simplified initialization - no complex stability checks
   React.useEffect(() => {
@@ -185,6 +188,18 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
     }
   };
 
+  const handleProjectDelete = async (projectId: string) => {
+    try {
+      console.log('🗑️ Deleting entire project:', projectId);
+      await deleteProject(projectId);
+      console.log('✅ Project deleted successfully');
+      onNoteUpdate();
+      onOpenChange(false);
+    } catch (error) {
+      console.error('❌ Error deleting project:', error);
+    }
+  };
+
   const handleCustomProjectCreated = (projectId: string, phase: string) => {
     console.log('🎯 Custom project created:', { projectId, phase });
     setNewProjectContext({ projectId, phase });
@@ -232,6 +247,13 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
       console.error('❌ Error getting initial project phase:', error);
       return null;
     }
+  };
+
+  // Check if a project is a custom project (based on naming pattern or other indicators)
+  const isCustomProject = (project: any) => {
+    return project.projectName?.toLowerCase().includes('custom') || 
+           project.projectName?.toLowerCase().includes('temp') ||
+           phases.some(p => p.projectId === project.projectId && p.color === 'bg-purple-500');
   };
 
   const isSaving = upsertProjectNoteMutation.isPending || upsertDailyNoteMutation.isPending;
@@ -289,11 +311,51 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
                   ? phases.filter(p => p?.projectId === project.projectId)
                   : [];
                 
+                const isCustomProj = isCustomProject(project);
+                
                 return (
                   <div key={project.projectId} className="p-4 border rounded-lg">
-                    <h4 className="font-semibold text-lg mb-2">
-                      {project.projectName || `Project ${project.projectId}`}
-                    </h4>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold text-lg flex items-center gap-2">
+                        {project.projectName || `Project ${project.projectId}`}
+                        {isCustomProj && (
+                          <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full">
+                            Custom
+                          </span>
+                        )}
+                      </h4>
+                      {isCustomProj && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              disabled={isDeletingProject}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Custom Project</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete this custom project? This action cannot be undone and will remove all associated data.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction 
+                                onClick={() => handleProjectDelete(project.projectId)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Delete Project
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </div>
                     <div className="space-y-2 mb-3">
                       {projectPhases.map(phase => (
                         <div key={phase.id} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
