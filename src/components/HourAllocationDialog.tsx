@@ -31,6 +31,7 @@ const HourAllocationDialog = ({ date, phases, initialProjectPhase, open, onOpenC
   const [isAutoFilling, setIsAutoFilling] = React.useState(false);
   const [autoFillProgress, setAutoFillProgress] = React.useState(0);
   const [autoFillTotal, setAutoFillTotal] = React.useState(0);
+  const [isInitialDataLoaded, setIsInitialDataLoaded] = React.useState(false);
 
   const { teamMembers, isLoading: isLoadingTeamMembers } = useTeamMembers();
   const { data: allocations = [], isLoading: isLoadingAllocations, refetch: refetchAllocations } = useDailyHourAllocations(date);
@@ -41,9 +42,16 @@ const HourAllocationDialog = ({ date, phases, initialProjectPhase, open, onOpenC
 
   const { capacityInfo, hasOverAllocation } = useDayCapacityInfo(date, allocations, capacities);
 
+  // Track when initial data has loaded to prevent premature dialog closure
+  React.useEffect(() => {
+    if (!isLoadingTeamMembers && !isLoadingAllocations && !isLoadingCapacities) {
+      setIsInitialDataLoaded(true);
+    }
+  }, [isLoadingTeamMembers, isLoadingAllocations, isLoadingCapacities]);
+
   // Set initial values when dialog opens with selected phase context
   React.useEffect(() => {
-    if (open && initialProjectPhase) {
+    if (open && initialProjectPhase && isInitialDataLoaded) {
       setSelectedProject(initialProjectPhase.projectId);
       setSelectedPhase(initialProjectPhase.phase);
     } else if (!open) {
@@ -52,8 +60,9 @@ const HourAllocationDialog = ({ date, phases, initialProjectPhase, open, onOpenC
       setSelectedPhase('');
       setSelectedTeamMembers([]);
       setSelectedHourBlocks([]);
+      setIsInitialDataLoaded(false);
     }
-  }, [open, initialProjectPhase]);
+  }, [open, initialProjectPhase, isInitialDataLoaded]);
 
   React.useEffect(() => {
     if (open) {

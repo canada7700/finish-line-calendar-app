@@ -43,6 +43,9 @@ const CustomProjectDialog = ({ date, open, onOpenChange, onProjectCreated }: Cus
       return;
     }
 
+    const dateString = format(date, 'yyyy-MM-dd');
+
+    // For custom projects, set the phase-specific start date to the selected date
     const projectData = {
       jobName: jobName.trim(),
       jobDescription: `Custom project for ${format(date, 'MMMM d, yyyy')}`,
@@ -50,14 +53,14 @@ const CustomProjectDialog = ({ date, open, onOpenChange, onProjectCreated }: Cus
       boxConstructionHrs: phase === 'boxConstruction' ? hours : 0,
       stainHrs: phase === 'stain' ? hours : 0,
       installHrs: phase === 'install' ? hours : 0,
-      installDate: format(date, 'yyyy-MM-dd'),
+      installDate: phase === 'install' ? dateString : null,
       materialOrderDate: null,
       boxToekickAssemblyDate: null,
       millingFillersDate: null,
       stainLacquerDate: null,
-      millworkStartDate: format(date, 'yyyy-MM-dd'),
-      boxConstructionStartDate: format(date, 'yyyy-MM-dd'),
-      stainStartDate: format(date, 'yyyy-MM-dd'),
+      millworkStartDate: phase === 'millwork' ? dateString : null,
+      boxConstructionStartDate: phase === 'boxConstruction' ? dateString : null,
+      stainStartDate: phase === 'stain' ? dateString : null,
       status: 'custom' as const
     };
 

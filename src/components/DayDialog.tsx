@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { ProjectPhase, ProjectNote, DailyNote } from '../types/project';
 import { format } from 'date-fns';
@@ -94,11 +93,16 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
   };
 
   const handleCustomProjectCreated = (projectId: string, phase: string) => {
-    // Store the new project context and open hour allocation
+    // Store the new project context and add a delay before opening hour allocation
     setNewProjectContext({ projectId, phase });
-    setShowHourAllocation(true);
-    // Trigger a refresh of the data
+    
+    // Trigger a refresh of the data first
     onNoteUpdate();
+    
+    // Add a delay to allow data to refresh before opening the dialog
+    setTimeout(() => {
+      setShowHourAllocation(true);
+    }, 500);
   };
 
   const isSaving = upsertProjectNoteMutation.isPending || upsertDailyNoteMutation.isPending;
