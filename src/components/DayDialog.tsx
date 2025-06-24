@@ -1,3 +1,4 @@
+
 import * as React from 'react';
 import { ProjectPhase, ProjectNote, DailyNote } from '../types/project';
 import { format } from 'date-fns';
@@ -185,7 +186,9 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
             {projectsOnDay.length > 0 ? (
               projectsOnDay.map(project => (
                 <div key={project.projectId} className="p-4 border rounded-lg">
-                  <h4 className="font-semibold text-lg mb-2">{project.projectName}</h4>
+                  <h4 className="font-semibold text-lg mb-2">
+                    {project.projectName || `Project ${project.projectId}`}
+                  </h4>
                   <div className="space-y-2 mb-3">
                     {phases.filter(p => p.projectId === project.projectId).map(phase => (
                       <div key={phase.id} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
@@ -207,7 +210,7 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
                     ))}
                   </div>
                   <div>
-                    <label htmlFor={`note-${project.projectId}`} className="text-sm font-medium text-muted-foreground mb-1 block">Notes for {project.projectName}</label>
+                    <label htmlFor={`note-${project.projectId}`} className="text-sm font-medium text-muted-foreground mb-1 block">Notes for {project.projectName || `Project ${project.projectId}`}</label>
                     <Textarea
                       id={`note-${project.projectId}`}
                       placeholder={`Add a project-specific note for this day...`}
