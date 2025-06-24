@@ -1,4 +1,3 @@
-
 import { useMemo, useState, useEffect } from 'react';
 import { ProjectPhase, ProjectNote, DailyNote } from '../types/project';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend, startOfWeek, endOfWeek } from 'date-fns';
@@ -10,9 +9,10 @@ import { useProjectNotes } from '@/hooks/useProjectNotes';
 import { useDailyNotes } from '@/hooks/useDailyNotes';
 import { usePhaseExceptions } from '@/hooks/usePhaseExceptions';
 import { useDailyHourAllocations } from '@/hooks/useDailyHourAllocations';
-import { useDailyPhaseCapacities, useDayCapacityInfo } from '@/hooks/useDailyCapacities';
+import { useDailyPhaseCapacities, calculateDayCapacityInfo } from '@/hooks/useDailyCapacities';
 import { useProjectRescheduling } from '@/hooks/useProjectRescheduling';
 import { useDailyCapacityStatus } from '@/hooks/useDailyCapacityStatus';
+import { useDailyCapacityOverrides } from '@/hooks/useDailyCapacityOverrides';
 import DayDialog from './DayDialog';
 import DraggableProjectPhase from './DraggableProjectPhase';
 import DroppableCalendarDay from './DroppableCalendarDay';
@@ -36,10 +36,14 @@ const MonthView = ({ monthDate, phases, holidays, showCapacityView = false }: Mo
   const monthStart = startOfMonth(monthDate);
   const monthEnd = endOfMonth(monthDate);
   
+  // Move all hook calls to the top level
   const { data: projectNotes = [], refetch: refetchProjectNotes } = useProjectNotes(monthStart, monthEnd);
   const { data: dailyNotes = [], refetch: refetchDailyNotes } = useDailyNotes(monthStart, monthEnd);
   const { data: phaseExceptions = [], refetch: refetchPhaseExceptions } = usePhaseExceptions();
   const { data: capacities = [] } = useDailyPhaseCapacities();
+  
+  // Get capacity overrides for the entire month at the top level
+  const { data: monthOverrides = [] } = useDailyCapacityOverrides(monthStart);
 
   const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });

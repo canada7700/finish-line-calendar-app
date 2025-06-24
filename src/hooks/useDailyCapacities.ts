@@ -61,26 +61,24 @@ export const useUpdatePhaseCapacity = () => {
   });
 };
 
-export const useDayCapacityInfo = (date: Date, allocations: DailyHourAllocation[], capacities: DailyPhaseCapacity[]) => {
-  // Use a more resilient approach for capacity overrides - don't fail if they can't be loaded
-  const { data: overrides = [], error: overridesError } = useDailyCapacityOverrides(date);
+// This is now a pure function that doesn't call hooks
+export const calculateDayCapacityInfo = (
+  date: Date, 
+  allocations: DailyHourAllocation[], 
+  capacities: DailyPhaseCapacity[],
+  overrides: any[] = []
+): { capacityInfo: DayCapacityInfo[]; hasOverAllocation: boolean; totalAllocated: number; overrides: any[] } => {
   const dateString = date.toISOString().split('T')[0];
-  
-  // Log override errors but don't break the flow
-  if (overridesError) {
-    console.warn('Failed to load capacity overrides, using default capacities:', overridesError);
-  }
   
   const capacityInfo: DayCapacityInfo[] = capacities.map(capacity => {
     const allocated = allocations.filter(
       allocation => allocation.date === dateString && allocation.phase === capacity.phase
     ).length;
 
-    // Check if there's an override for this phase on this date, but handle gracefully if overrides failed
+    // Check if there's an override for this phase on this date
     let override = null;
     try {
-      // Only try to find overrides if we have the data and no error
-      if (!overridesError && Array.isArray(overrides)) {
+      if (Array.isArray(overrides)) {
         override = overrides.find(o => o.phase === capacity.phase) || null;
       }
     } catch (error) {
@@ -108,6 +106,18 @@ export const useDayCapacityInfo = (date: Date, allocations: DailyHourAllocation[
     capacityInfo,
     hasOverAllocation,
     totalAllocated,
-    overrides: overrides || [], // Ensure overrides is always an array
+    overrides: overrides || [],
   };
+};
+
+// Hook version that properly calls hooks at the top level
+export const useDayCapacityInfo = (date: Date, allocations: DailyHourAllocation[], capacities: DailyPhaseCapacity[]) => {
+  const { data: overrides = [], error: overridesError } = useDailyCapacityOverrides(date);
+  
+  // Log override errors but don't break the flow
+  if (overridesError) {
+    console.warn('Failed to load capacity overrides, using default capacities:', overridesError);
+  }
+  
+  return calculateDayCapacityInfo(date, allocations, capacities, overrides);
 };
