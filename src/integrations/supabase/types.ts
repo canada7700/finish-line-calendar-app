@@ -105,6 +105,36 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_phase_capacity_overrides: {
+        Row: {
+          adjusted_capacity: number
+          created_at: string
+          date: string
+          id: string
+          phase: string
+          reason: string | null
+          updated_at: string
+        }
+        Insert: {
+          adjusted_capacity: number
+          created_at?: string
+          date: string
+          id?: string
+          phase: string
+          reason?: string | null
+          updated_at?: string
+        }
+        Update: {
+          adjusted_capacity?: number
+          created_at?: string
+          date?: string
+          id?: string
+          phase?: string
+          reason?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       holidays: {
         Row: {
           created_at: string

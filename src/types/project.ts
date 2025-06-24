@@ -98,8 +98,11 @@ export interface DailyPhaseCapacity {
 }
 
 export interface DayCapacityInfo {
-  phase: 'millwork' | 'boxConstruction' | 'stain' | 'install';
+  phase: string;
   allocated: number;
   capacity: number;
+  defaultCapacity?: number;
   isOverAllocated: boolean;
+  hasOverride?: boolean;
+  overrideReason?: string;
 }

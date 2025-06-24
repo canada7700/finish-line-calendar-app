@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { DailyPhaseCapacity, DayCapacityInfo, DailyHourAllocation } from '../types/project';
 import { toast } from '@/hooks/use-toast';
+import { useDailyCapacityOverrides } from './useDailyCapacityOverrides';
 
 export const useDailyPhaseCapacities = () => {
   return useQuery({
@@ -61,6 +62,7 @@ export const useUpdatePhaseCapacity = () => {
 };
 
 export const useDayCapacityInfo = (date: Date, allocations: DailyHourAllocation[], capacities: DailyPhaseCapacity[]) => {
+  const { data: overrides = [] } = useDailyCapacityOverrides(date);
   const dateString = date.toISOString().split('T')[0];
   
   const capacityInfo: DayCapacityInfo[] = capacities.map(capacity => {
@@ -68,11 +70,18 @@ export const useDayCapacityInfo = (date: Date, allocations: DailyHourAllocation[
       allocation => allocation.date === dateString && allocation.phase === capacity.phase
     ).length;
 
+    // Check if there's an override for this phase on this date
+    const override = overrides.find(o => o.phase === capacity.phase);
+    const effectiveCapacity = override ? override.adjustedCapacity : capacity.maxHours;
+
     return {
       phase: capacity.phase,
       allocated,
-      capacity: capacity.maxHours,
-      isOverAllocated: allocated > capacity.maxHours,
+      capacity: effectiveCapacity,
+      defaultCapacity: capacity.maxHours,
+      isOverAllocated: allocated > effectiveCapacity,
+      hasOverride: !!override,
+      overrideReason: override?.reason,
     };
   });
 
@@ -83,5 +92,6 @@ export const useDayCapacityInfo = (date: Date, allocations: DailyHourAllocation[
     capacityInfo,
     hasOverAllocation,
     totalAllocated,
+    overrides,
   };
 };

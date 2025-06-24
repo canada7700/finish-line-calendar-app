@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -394,6 +393,7 @@ const HourAllocationDialog = ({ date, phases, initialProjectPhase, open, onOpenC
               hasOverAllocation={hasOverAllocation}
               allocations={allocations}
               isLoadingCapacities={isLoadingCapacities}
+              date={date}
             />
           </TabsContent>
 
