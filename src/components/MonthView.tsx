@@ -41,8 +41,6 @@ const MonthView = ({ monthDate, phases, holidays, showCapacityView = false }: Mo
   const { data: dailyNotes = [], refetch: refetchDailyNotes } = useDailyNotes(monthStart, monthEnd);
   const { data: phaseExceptions = [], refetch: refetchPhaseExceptions } = usePhaseExceptions();
   const { data: capacities = [] } = useDailyPhaseCapacities();
-  
-  // Get capacity overrides for the entire month at the top level
   const { data: monthOverrides = [] } = useDailyCapacityOverrides(monthStart);
 
   const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
@@ -191,12 +189,17 @@ const MonthView = ({ monthDate, phases, holidays, showCapacityView = false }: Mo
     return classes;
   };
 
-  const handleDayClick = (day: Date) => {
-    setDialogState({ open: true, date: day, selectedPhase: null });
+  const handleDayClick = (day: Date, event: React.MouseEvent) => {
+    // Only handle day clicks if the click wasn't on a project phase
+    if (event.target === event.currentTarget) {
+      setDialogState({ open: true, date: day, selectedPhase: null });
+    }
   };
 
   const handlePhaseClick = (day: Date, phase: ProjectPhase, event: React.MouseEvent) => {
+    // Stop event propagation to prevent day click from firing
     event.stopPropagation();
+    console.log('Phase clicked:', phase.projectName, 'on', format(day, 'yyyy-MM-dd'));
     setDialogState({ open: true, date: day, selectedPhase: phase });
   };
   
@@ -253,7 +256,7 @@ const MonthView = ({ monthDate, phases, holidays, showCapacityView = false }: Mo
                 >
                   <div
                     className={getDayClasses(day, dayPhases, hasCapacityIssues)}
-                    onClick={() => handleDayClick(day)}
+                    onClick={(event) => handleDayClick(day, event)}
                   >
                     <div>
                       <div className="flex items-center justify-between mb-1">
