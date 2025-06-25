@@ -166,7 +166,7 @@ export const SimplifiedAssignmentManager: React.FC<SimplifiedAssignmentManagerPr
                   <TableHeader>
                     <TableRow>
                       <TableHead className="py-2">Member</TableHead>
-                      <TableHead className="py-2 w-20">Hours</TableHead>
+                      <TableHead className="py-2 w-24">Hours</TableHead>
                       <TableHead className="py-2 w-12"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -187,7 +187,7 @@ export const SimplifiedAssignmentManager: React.FC<SimplifiedAssignmentManagerPr
                               value={displayValue}
                               onChange={e => handleHourInputChange(assignment.id, e.target.value)}
                               onBlur={() => handleHourInputBlur(assignment.id)}
-                              className="w-16 h-8 text-xs"
+                              className="w-20 h-8 text-xs"
                             />
                           </TableCell>
                           <TableCell className="py-2">
@@ -232,7 +232,7 @@ export const SimplifiedAssignmentManager: React.FC<SimplifiedAssignmentManagerPr
                   placeholder="Hours"
                   value={selectedHours || ''}
                   onChange={e => updateNewAssignment(phase.key, 'hours', parseInt(e.target.value) || 0)}
-                  className="w-16 h-8 text-xs"
+                  className="w-24 h-8 text-xs"
                 />
                 <Button 
                   onClick={() => handleAddAssignment(phase.key)} 
