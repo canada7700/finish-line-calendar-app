@@ -88,8 +88,6 @@ export const useAddProjectAssignment = () => {
                 stainLacquerDate: projectResponse.data.stain_lacquer_date,
                 millingFillersDate: projectResponse.data.milling_fillers_date,
                 boxToekickAssemblyDate: projectResponse.data.box_toekick_assembly_date,
-                createdAt: projectResponse.data.created_at,
-                updatedAt: projectResponse.data.updated_at,
               },
               teamMembers: teamMembersResponse.data.map((tm: any) => ({
                 id: tm.id,
@@ -216,8 +214,6 @@ export const useUpdateProjectAssignment = () => {
                   stainLacquerDate: projectResponse.data.stain_lacquer_date,
                   millingFillersDate: projectResponse.data.milling_fillers_date,
                   boxToekickAssemblyDate: projectResponse.data.box_toekick_assembly_date,
-                  createdAt: projectResponse.data.created_at,
-                  updatedAt: projectResponse.data.updated_at,
                 },
                 teamMembers: teamMembersResponse.data.map((tm: any) => ({
                   id: tm.id,
