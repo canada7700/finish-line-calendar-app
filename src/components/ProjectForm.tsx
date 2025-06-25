@@ -13,7 +13,8 @@ import { cn } from '@/lib/utils';
 import { ProjectScheduler } from '../utils/projectScheduler';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ProjectAssignmentManager } from './ProjectAssignmentManager';
+import { Switch } from '@/components/ui/switch';
+import { SimplifiedAssignmentManager } from './SimplifiedAssignmentManager';
 
 interface ProjectFormProps {
   onSubmit: (project: Omit<Project, 'id'> | Project) => void;
@@ -36,6 +37,7 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false, projectToEdit =
 
   const [installDate, setInstallDate] = useState<Date>();
   const [materialOrderDate, setMaterialOrderDate] = useState<Date | null>(null);
+  const [requiresMaterialOrder, setRequiresMaterialOrder] = useState(true);
   const [dateWarning, setDateWarning] = useState<string>('');
 
   useEffect(() => {
@@ -52,6 +54,7 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false, projectToEdit =
         const installD = new Date(`${projectToEdit.installDate}T00:00:00`);
         setInstallDate(installD);
         setMaterialOrderDate(subDays(installD, 60));
+        setRequiresMaterialOrder(true);
       }
       setDateWarning('');
     } else {
@@ -65,15 +68,16 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false, projectToEdit =
       });
       setInstallDate(undefined);
       setMaterialOrderDate(null);
+      setRequiresMaterialOrder(true);
       setDateWarning('');
     }
   }, [projectToEdit, isEditing]);
 
   const handleInstallDateSelect = async (date: Date | undefined) => {
     setInstallDate(date);
-    if (date) {
+    if (date && requiresMaterialOrder) {
       setMaterialOrderDate(subDays(date, 60));
-    } else {
+    } else if (!requiresMaterialOrder) {
       setMaterialOrderDate(null);
     }
     setDateWarning('');
@@ -88,6 +92,15 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false, projectToEdit =
           `Selected date is a ${reason}. Consider ${format(validation.suggestedDate, 'MMMM do, yyyy')} instead.`
         );
       }
+    }
+  };
+
+  const handleMaterialOrderToggle = (checked: boolean) => {
+    setRequiresMaterialOrder(checked);
+    if (checked && installDate) {
+      setMaterialOrderDate(subDays(installDate, 60));
+    } else {
+      setMaterialOrderDate(null);
     }
   };
 
@@ -242,12 +255,35 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false, projectToEdit =
                   <span className="text-sm text-yellow-800">{dateWarning}</span>
                 </div>
               )}
+            </div>
+
+            {/* Material Order Date Control */}
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="material-order"
+                  checked={requiresMaterialOrder}
+                  onCheckedChange={handleMaterialOrderToggle}
+                  disabled={isSubmitting}
+                />
+                <Label htmlFor="material-order" className="text-sm font-medium">
+                  Requires Material Order Date
+                </Label>
+              </div>
               
-              {materialOrderDate && (
-                <div className="p-3 bg-red-100 border border-red-200 rounded-md mt-2">
+              {requiresMaterialOrder && materialOrderDate && (
+                <div className="p-3 bg-red-100 border border-red-200 rounded-md">
                   <p className="text-sm font-semibold text-red-700 text-center">
                     {formData.jobName ? `${formData.jobName} Material Order Date: ` : 'Material Order Date: '}
                     {format(materialOrderDate, 'PPP')}
+                  </p>
+                </div>
+              )}
+              
+              {!requiresMaterialOrder && (
+                <div className="p-2 bg-gray-100 border border-gray-200 rounded-md">
+                  <p className="text-sm text-gray-600 text-center">
+                    No material order date required for this project
                   </p>
                 </div>
               )}
@@ -271,40 +307,33 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false, projectToEdit =
         </div>
       </div>
 
-      {/* Right Side - Assignment Manager with Independent Scroll */}
+      {/* Right Side - Simplified Assignment Manager with Independent Scroll */}
       <div className="flex-1 pl-6">
         <div className="h-full flex flex-col">
           <div className="flex items-center gap-3 mb-4">
             <Users className="h-6 w-6 text-blue-600" />
             <h3 className="text-xl font-semibold">Team Assignments</h3>
             <div className="text-sm text-muted-foreground ml-auto">
-              Assign team members to project phases
+              Quick assign team members
             </div>
           </div>
           
           <ScrollArea className="flex-1">
             <div className="pr-4">
               {isEditing && projectToEdit ? (
-                <ProjectAssignmentManager project={projectToEdit} />
+                <SimplifiedAssignmentManager project={projectToEdit} />
               ) : (
-                <div className="space-y-6">
-                  <div className="space-y-4">
-                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <h4 className="font-medium text-blue-900 mb-2">Assign Team Members After Creation</h4>
-                      <p className="text-sm text-blue-800 mb-3">
-                        Once you create this project, you'll be able to assign team members to each phase:
-                      </p>
-                      <ul className="text-sm text-blue-700 space-y-1">
-                        <li>• <strong>Millwork</strong> ({formData.millworkHrs} hours)</li>
-                        <li>• <strong>Box Construction</strong> ({formData.boxConstructionHrs} hours)</li>
-                        <li>• <strong>Stain</strong> ({formData.stainHrs} hours)</li>
-                        <li>• <strong>Install</strong> ({formData.installHrs} hours)</li>
-                      </ul>
-                    </div>
-                    <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
-                      <p className="text-sm text-gray-600">
-                        💡 <strong>Tip:</strong> After clicking "Add Project", this dialog will automatically switch to edit mode where you can manage team assignments for each phase.
-                      </p>
+                <div className="space-y-4">
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h4 className="font-medium text-blue-900 mb-2">Assign After Creation</h4>
+                    <p className="text-sm text-blue-800 mb-3">
+                      Once created, you can quickly assign team members:
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 text-sm text-blue-700">
+                      <div>• <strong>Millwork:</strong> {formData.millworkHrs}h</div>
+                      <div>• <strong>Boxes:</strong> {formData.boxConstructionHrs}h</div>
+                      <div>• <strong>Stain:</strong> {formData.stainHrs}h</div>
+                      <div>• <strong>Install:</strong> {formData.installHrs}h</div>
                     </div>
                   </div>
                 </div>
