@@ -4,11 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { AlertTriangle, Users, Loader2, Settings } from 'lucide-react';
-import { useSetCapacityOverride, useRemoveCapacityOverride } from '../../hooks/useDailyCapacityOverrides';
-import CapacityAdjustmentDialog from './CapacityAdjustmentDialog';
+import { AlertTriangle, Settings, Loader2 } from 'lucide-react';
+import { useSetCapacityOverride, useRemoveCapacityOverride } from '../hooks/useDailyCapacityOverrides';
+import CapacityAdjustmentDialog from './hour-allocation/CapacityAdjustmentDialog';
 
-interface OverviewTabProps {
+interface CapacityOverviewTabProps {
   capacityInfo: Array<{
     phase: string;
     allocated: number;
@@ -23,7 +23,7 @@ interface OverviewTabProps {
   date: Date;
 }
 
-const OverviewTab: React.FC<OverviewTabProps> = ({
+const CapacityOverviewTab: React.FC<CapacityOverviewTabProps> = ({
   capacityInfo,
   hasOverAllocation,
   isLoadingCapacities,
@@ -136,4 +136,4 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
   );
 };
 
-export default OverviewTab;
+export default CapacityOverviewTab;
