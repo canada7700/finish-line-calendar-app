@@ -9,53 +9,38 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      daily_hour_allocations: {
+      capacity_templates: {
         Row: {
+          box_construction_hours: number
           created_at: string
-          date: string
-          hour_block: number
           id: string
-          phase: string
-          project_id: string
-          team_member_id: string
+          install_hours: number
+          millwork_hours: number
+          name: string
+          stain_hours: number
           updated_at: string
         }
         Insert: {
+          box_construction_hours?: number
           created_at?: string
-          date: string
-          hour_block: number
           id?: string
-          phase: string
-          project_id: string
-          team_member_id: string
+          install_hours?: number
+          millwork_hours?: number
+          name: string
+          stain_hours?: number
           updated_at?: string
         }
         Update: {
+          box_construction_hours?: number
           created_at?: string
-          date?: string
-          hour_block?: number
           id?: string
-          phase?: string
-          project_id?: string
-          team_member_id?: string
+          install_hours?: number
+          millwork_hours?: number
+          name?: string
+          stain_hours?: number
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "daily_hour_allocations_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "daily_hour_allocations_team_member_id_fkey"
-            columns: ["team_member_id"]
-            isOneToOne: false
-            referencedRelation: "team_members"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       daily_notes: {
         Row: {
@@ -80,6 +65,44 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      daily_phase_allocations: {
+        Row: {
+          allocated_hours: number
+          created_at: string
+          date: string
+          id: string
+          phase: string
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          allocated_hours?: number
+          created_at?: string
+          date: string
+          id?: string
+          phase: string
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          allocated_hours?: number
+          created_at?: string
+          date?: string
+          id?: string
+          phase?: string
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_phase_allocations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       daily_phase_capacities: {
         Row: {
@@ -155,60 +178,6 @@ export type Database = {
           name?: string
         }
         Relationships: []
-      }
-      project_assignments: {
-        Row: {
-          actual_hours: number | null
-          assigned_hours: number
-          created_at: string
-          end_date: string | null
-          id: string
-          phase: string
-          project_id: string
-          start_date: string | null
-          team_member_id: string
-          updated_at: string
-        }
-        Insert: {
-          actual_hours?: number | null
-          assigned_hours?: number
-          created_at?: string
-          end_date?: string | null
-          id?: string
-          phase: string
-          project_id: string
-          start_date?: string | null
-          team_member_id: string
-          updated_at?: string
-        }
-        Update: {
-          actual_hours?: number | null
-          assigned_hours?: number
-          created_at?: string
-          end_date?: string | null
-          id?: string
-          phase?: string
-          project_id?: string
-          start_date?: string | null
-          team_member_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "project_assignments_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "project_assignments_team_member_id_fkey"
-            columns: ["team_member_id"]
-            isOneToOne: false
-            referencedRelation: "team_members"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       project_notes: {
         Row: {
@@ -364,50 +333,43 @@ export type Database = {
         }
         Relationships: []
       }
-      team_members: {
+      unscheduled_hours: {
         Row: {
-          can_do_boxes: boolean
-          can_do_install: boolean
-          can_do_millwork: boolean
-          can_do_stain: boolean
           created_at: string
-          email: string | null
-          hourly_rate: number | null
+          hours: number
           id: string
-          is_active: boolean
-          name: string
+          phase: string
+          project_id: string
+          reason: string | null
           updated_at: string
-          weekly_hours: number
         }
         Insert: {
-          can_do_boxes?: boolean
-          can_do_install?: boolean
-          can_do_millwork?: boolean
-          can_do_stain?: boolean
           created_at?: string
-          email?: string | null
-          hourly_rate?: number | null
+          hours?: number
           id?: string
-          is_active?: boolean
-          name: string
+          phase: string
+          project_id: string
+          reason?: string | null
           updated_at?: string
-          weekly_hours?: number
         }
         Update: {
-          can_do_boxes?: boolean
-          can_do_install?: boolean
-          can_do_millwork?: boolean
-          can_do_stain?: boolean
           created_at?: string
-          email?: string | null
-          hourly_rate?: number | null
+          hours?: number
           id?: string
-          is_active?: boolean
-          name?: string
+          phase?: string
+          project_id?: string
+          reason?: string | null
           updated_at?: string
-          weekly_hours?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "unscheduled_hours_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

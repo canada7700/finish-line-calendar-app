@@ -1,3 +1,4 @@
+
 export interface Project {
   id: string;
   jobName: string;
@@ -26,37 +27,6 @@ export interface ProjectPhase {
   endDate: string;
   hours: number;
   color: string;
-  assignedMembers?: TeamMember[];
-}
-
-export interface TeamMember {
-  id: string;
-  name: string;
-  email?: string;
-  weeklyHours: number;
-  hourlyRate?: number;
-  canDoMillwork: boolean;
-  canDoBoxes: boolean;
-  canDoStain: boolean;
-  canDoInstall: boolean;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface ProjectAssignment {
-  id: string;
-  projectId: string;
-  teamMemberId: string;
-  phase: 'millwork' | 'boxConstruction' | 'stain' | 'install';
-  assignedHours: number;
-  actualHours?: number | null;
-  startDate?: string;
-  endDate?: string;
-  createdAt: string;
-  updatedAt: string;
-  teamMember?: TeamMember;
-  project?: Pick<Project, 'id' | 'jobName'>;
 }
 
 export interface ProjectNote {
@@ -76,16 +46,25 @@ export interface DailyNote {
   updated_at: string;
 }
 
-export interface DailyHourAllocation {
+export interface DailyPhaseAllocation {
   id: string;
   projectId: string;
-  teamMemberId: string;
   phase: 'millwork' | 'boxConstruction' | 'stain' | 'install';
   date: string;
-  hourBlock: number;
+  allocatedHours: number;
   createdAt: string;
   updatedAt: string;
-  teamMember?: TeamMember;
+  project?: Pick<Project, 'id' | 'jobName'>;
+}
+
+export interface UnscheduledHours {
+  id: string;
+  projectId: string;
+  phase: 'millwork' | 'boxConstruction' | 'stain' | 'install';
+  hours: number;
+  reason?: string;
+  createdAt: string;
+  updatedAt: string;
   project?: Pick<Project, 'id' | 'jobName'>;
 }
 
@@ -93,6 +72,17 @@ export interface DailyPhaseCapacity {
   id: string;
   phase: 'millwork' | 'boxConstruction' | 'stain' | 'install';
   maxHours: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CapacityTemplate {
+  id: string;
+  name: string;
+  millworkHours: number;
+  boxConstructionHours: number;
+  stainHours: number;
+  installHours: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -105,4 +95,5 @@ export interface DayCapacityInfo {
   isOverAllocated: boolean;
   hasOverride?: boolean;
   overrideReason?: string;
+  utilizationPercent: number;
 }

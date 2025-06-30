@@ -1,7 +1,7 @@
 
 import { useMemo } from 'react';
-import { useDailyHourAllocations } from './useDailyHourAllocations';
-import { useDailyPhaseCapacities, useDayCapacityInfo } from './useDailyCapacities';
+import { useDailyPhaseAllocations } from './useDailyPhaseAllocations';
+import { useDailyPhaseCapacities, calculateDayCapacityInfo } from './useDailyCapacities';
 import { format, eachDayOfInterval } from 'date-fns';
 
 export interface DailyCapacityStatus {
@@ -17,7 +17,7 @@ export const useDailyCapacityStatus = (startDate: Date, endDate: Date) => {
   const { data: capacities = [] } = useDailyPhaseCapacities();
   
   // Get all allocations for the entire date range in one query
-  const { data: allAllocations = [] } = useDailyHourAllocations();
+  const { data: allAllocations = [] } = useDailyPhaseAllocations({ start: startDate, end: endDate });
   
   // Get all days in the range
   const days = eachDayOfInterval({ start: startDate, end: endDate });
@@ -31,7 +31,7 @@ export const useDailyCapacityStatus = (startDate: Date, endDate: Date) => {
       // Filter allocations for this specific date
       const dayAllocations = allAllocations.filter(alloc => alloc.date === dateString);
       
-      const { capacityInfo, hasOverAllocation, totalAllocated } = useDayCapacityInfo(day, dayAllocations, capacities);
+      const { capacityInfo, hasOverAllocation, totalAllocated } = calculateDayCapacityInfo(day, dayAllocations, capacities);
       
       const totalCapacity = capacityInfo.reduce((sum, info) => sum + info.capacity, 0);
       

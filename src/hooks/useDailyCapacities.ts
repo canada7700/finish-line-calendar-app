@@ -1,7 +1,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { DailyPhaseCapacity, DayCapacityInfo, DailyHourAllocation } from '../types/project';
+import { DailyPhaseCapacity, DayCapacityInfo, DailyPhaseAllocation } from '../types/project';
 import { toast } from '@/hooks/use-toast';
 import { useDailyCapacityOverrides } from './useDailyCapacityOverrides';
 
@@ -64,7 +64,7 @@ export const useUpdatePhaseCapacity = () => {
 // This is now a pure function that doesn't call hooks
 export const calculateDayCapacityInfo = (
   date: Date, 
-  allocations: DailyHourAllocation[], 
+  allocations: DailyPhaseAllocation[], 
   capacities: DailyPhaseCapacity[],
   overrides: any[] = []
 ): { capacityInfo: DayCapacityInfo[]; hasOverAllocation: boolean; totalAllocated: number; overrides: any[] } => {
@@ -73,7 +73,7 @@ export const calculateDayCapacityInfo = (
   const capacityInfo: DayCapacityInfo[] = capacities.map(capacity => {
     const allocated = allocations.filter(
       allocation => allocation.date === dateString && allocation.phase === capacity.phase
-    ).length;
+    ).reduce((sum, alloc) => sum + alloc.allocatedHours, 0);
 
     // Check if there's an override for this phase on this date
     let override = null;
@@ -87,6 +87,7 @@ export const calculateDayCapacityInfo = (
     }
     
     const effectiveCapacity = override ? override.adjustedCapacity : capacity.maxHours;
+    const utilizationPercent = effectiveCapacity > 0 ? Math.round((allocated / effectiveCapacity) * 100) : 0;
 
     return {
       phase: capacity.phase,
@@ -96,6 +97,7 @@ export const calculateDayCapacityInfo = (
       isOverAllocated: allocated > effectiveCapacity,
       hasOverride: !!override,
       overrideReason: override?.reason,
+      utilizationPercent,
     };
   });
 
@@ -111,7 +113,7 @@ export const calculateDayCapacityInfo = (
 };
 
 // Hook version that properly calls hooks at the top level
-export const useDayCapacityInfo = (date: Date, allocations: DailyHourAllocation[], capacities: DailyPhaseCapacity[]) => {
+export const useDayCapacityInfo = (date: Date, allocations: DailyPhaseAllocation[], capacities: DailyPhaseCapacity[]) => {
   const { data: overrides = [], error: overridesError } = useDailyCapacityOverrides(date);
   
   // Log override errors but don't break the flow

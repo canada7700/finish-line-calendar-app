@@ -12,7 +12,6 @@ import ProjectsPage from "./pages/Projects";
 import CalendarPage from "./pages/CalendarPage";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
-import Team from "./pages/Team";
 
 const queryClient = new QueryClient();
 
@@ -27,7 +26,6 @@ const App = () => (
             <Route path="/" element={<Layout><ProjectsPage /></Layout>} />
             <Route path="/projects" element={<Layout><ProjectsPage /></Layout>} />
             <Route path="/calendar" element={<Layout><CalendarPage /></Layout>} />
-            <Route path="/team" element={<Layout><Team /></Layout>} />
             <Route path="/settings" element={<Layout><Settings /></Layout>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

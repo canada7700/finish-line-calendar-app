@@ -39,7 +39,7 @@ const CalendarPage = () => {
       clearTimeout(debounceTimeoutRef.current);
     }
 
-    // Use very long delay during drag to prevent any updates - this is the key fix
+    // Use very long delay during drag to prevent any updates
     const debounceDelay = isDragInProgress ? 30000 : 300;
 
     debounceTimeoutRef.current = setTimeout(async () => {
