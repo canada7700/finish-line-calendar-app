@@ -74,7 +74,7 @@ export default function MonthView({
                         {format(day, 'd')}
                       </span>
                       {dayCapacityStatus && (
-                        <CapacityStatusIndicator status={dayCapacityStatus} size="sm" />
+                        <CapacityStatusIndicator status={dayCapacityStatus} />
                       )}
                     </div>
                     
