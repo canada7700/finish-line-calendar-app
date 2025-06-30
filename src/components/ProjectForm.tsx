@@ -1,47 +1,51 @@
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Project } from '../types/project';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ProjectScheduler } from '../utils/projectScheduler';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, AlertTriangle, Users } from 'lucide-react';
-import { format, isWeekend, subDays } from 'date-fns';
+import { CalendarIcon, Save, X } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { ProjectScheduler } from '../utils/projectScheduler';
-import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Switch } from '@/components/ui/switch';
-import { SimplifiedAssignmentManager } from './SimplifiedAssignmentManager';
+import { toast } from '@/hooks/use-toast';
+import ProjectAssignmentManager from './ProjectAssignmentManager';
 
 interface ProjectFormProps {
-  onSubmit: (project: Omit<Project, 'id'> | Project) => void;
+  projectToEdit?: Project | null;
+  onSubmit: (project: Omit<Project, 'id'> | Project) => Promise<void>;
   onCancel: () => void;
   isSubmitting?: boolean;
-  projectToEdit?: Project | null;
 }
 
-const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false, projectToEdit = null }: ProjectFormProps) => {
-  const isEditing = !!projectToEdit;
-
-  const [formData, setFormData] = useState({
+const ProjectForm: React.FC<ProjectFormProps> = ({ projectToEdit, onSubmit, onCancel, isSubmitting = false }) => {
+  const [formData, setFormData] = useState<Omit<Project, 'id'>>({
     jobName: '',
     jobDescription: '',
     millworkHrs: 0,
     boxConstructionHrs: 0,
     stainHrs: 0,
     installHrs: 0,
+    installDate: '',
+    status: 'planning',
+    materialOrderDate: undefined,
+    boxToekickAssemblyDate: undefined,
+    millingFillersDate: undefined,
+    stainLacquerDate: undefined,
+    millworkStartDate: undefined,
+    boxConstructionStartDate: undefined,
+    stainStartDate: undefined,
   });
 
-  const [installDate, setInstallDate] = useState<Date>();
-  const [materialOrderDate, setMaterialOrderDate] = useState<Date | null>(null);
-  const [requiresMaterialOrder, setRequiresMaterialOrder] = useState(true);
-  const [dateWarning, setDateWarning] = useState<string>('');
+  const [installDateOpen, setInstallDateOpen] = useState(false);
 
   useEffect(() => {
-    if (isEditing && projectToEdit) {
+    if (projectToEdit) {
       setFormData({
         jobName: projectToEdit.jobName,
         jobDescription: projectToEdit.jobDescription,
@@ -49,297 +53,239 @@ const ProjectForm = ({ onSubmit, onCancel, isSubmitting = false, projectToEdit =
         boxConstructionHrs: projectToEdit.boxConstructionHrs,
         stainHrs: projectToEdit.stainHrs,
         installHrs: projectToEdit.installHrs,
+        installDate: projectToEdit.installDate,
+        status: projectToEdit.status,
+        materialOrderDate: projectToEdit.materialOrderDate,
+        boxToekickAssemblyDate: projectToEdit.boxToekickAssemblyDate,
+        millingFillersDate: projectToEdit.millingFillersDate,
+        stainLacquerDate: projectToEdit.stainLacquerDate,
+        millworkStartDate: projectToEdit.millworkStartDate,
+        boxConstructionStartDate: projectToEdit.boxConstructionStartDate,
+        stainStartDate: projectToEdit.stainStartDate,
       });
-      if (projectToEdit.installDate) {
-        const installD = new Date(`${projectToEdit.installDate}T00:00:00`);
-        setInstallDate(installD);
-        setMaterialOrderDate(subDays(installD, 60));
-        setRequiresMaterialOrder(true);
-      }
-      setDateWarning('');
-    } else {
-      setFormData({
-        jobName: '',
-        jobDescription: '',
-        millworkHrs: 0,
-        boxConstructionHrs: 0,
-        stainHrs: 0,
-        installHrs: 0,
-      });
-      setInstallDate(undefined);
-      setMaterialOrderDate(null);
-      setRequiresMaterialOrder(true);
-      setDateWarning('');
     }
-  }, [projectToEdit, isEditing]);
+  }, [projectToEdit]);
 
-  const handleInstallDateSelect = async (date: Date | undefined) => {
-    setInstallDate(date);
-    if (date && requiresMaterialOrder) {
-      setMaterialOrderDate(subDays(date, 60));
-    } else if (!requiresMaterialOrder) {
-      setMaterialOrderDate(null);
-    }
-    setDateWarning('');
-    
+  const handleInputChange = (field: keyof typeof formData, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleInstallDateSelect = (date: Date | undefined) => {
     if (date) {
-      await ProjectScheduler.loadHolidays();
-      const validation = ProjectScheduler.validateWorkingDay(date);
+      const dateString = format(date, 'yyyy-MM-dd');
       
-      if (!validation.isValid && validation.suggestedDate) {
-        const reason = isWeekend(date) ? 'weekend' : 'holiday';
-        setDateWarning(
-          `Selected date is a ${reason}. Consider ${format(validation.suggestedDate, 'MMMM do, yyyy')} instead.`
-        );
+      // Validate that the selected date is a working day
+      if (!ProjectScheduler.validateWorkingDay(date)) {
+        toast({
+          title: "Invalid Install Date",
+          description: "Install date must be a working day (Monday-Friday, excluding holidays).",
+          variant: "destructive",
+        });
+        return;
       }
+      
+      handleInputChange('installDate', dateString);
+      setInstallDateOpen(false);
     }
   };
 
-  const handleMaterialOrderToggle = (checked: boolean) => {
-    setRequiresMaterialOrder(checked);
-    if (checked && installDate) {
-      setMaterialOrderDate(subDays(installDate, 60));
-    } else {
-      setMaterialOrderDate(null);
-    }
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!installDate) return;
-
-    const baseProjectData = {
-        ...formData,
-        installDate: format(installDate, 'yyyy-MM-dd'),
-    };
     
-    if (isEditing && projectToEdit) {
-        onSubmit({
-            ...projectToEdit,
-            ...baseProjectData
-        });
-    } else {
-        onSubmit({
-            ...baseProjectData,
-            status: 'planning' as const,
-        });
+    if (!formData.jobName.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Job name is required.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.installDate) {
+      toast({
+        title: "Validation Error",
+        description: "Install date is required.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      if (projectToEdit) {
+        await onSubmit({ ...formData, id: projectToEdit.id });
+      } else {
+        await onSubmit(formData);
+      }
+    } catch (error) {
+      console.error('Form submission error:', error);
     }
   };
 
-  const handleInputChange = (field: string, value: string | number) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
+  const isEditing = !!projectToEdit;
 
   return (
-    <div className="flex h-full max-h-[85vh]">
-      {/* Left Side - Project Form */}
-      <div className="w-1/3 border-r border-border pr-6">
-        <div className="h-full">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="jobName">Job Name</Label>
-                <Input
-                  id="jobName"
-                  value={formData.jobName}
-                  onChange={(e) => handleInputChange('jobName', e.target.value)}
-                  placeholder="e.g., RACHEL WARKENTIN"
-                  required
-                  disabled={isSubmitting}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="jobDescription">Job Description</Label>
-                <Input
-                  id="jobDescription"
-                  value={formData.jobDescription}
-                  onChange={(e) => handleInputChange('jobDescription', e.target.value)}
-                  placeholder="e.g., CABINETS"
-                  required
-                  disabled={isSubmitting}
-                />
-              </div>
-            </div>
+    <div className="max-w-7xl mx-auto p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">{isEditing ? 'Edit Project' : 'Add New Project'}</h2>
+        <Button variant="outline" onClick={onCancel} className="flex items-center gap-2">
+          <X className="h-4 w-4" />
+          Cancel
+        </Button>
+      </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="millworkHrs">Millwork Hours</Label>
-                <Input
-                  id="millworkHrs"
-                  type="number"
-                  min="0"
-                  value={formData.millworkHrs}
-                  onChange={(e) => handleInputChange('millworkHrs', parseInt(e.target.value) || 0)}
-                  placeholder="e.g., 90"
-                  disabled={isSubmitting}
-                  className="bg-blue-50 border-blue-200 focus:bg-blue-50"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="boxConstructionHrs">Box Construction Hours</Label>
-                <Input
-                  id="boxConstructionHrs"
-                  type="number"
-                  min="0"
-                  value={formData.boxConstructionHrs}
-                  onChange={(e) => handleInputChange('boxConstructionHrs', parseInt(e.target.value) || 0)}
-                  placeholder="e.g., 93"
-                  disabled={isSubmitting}
-                  className="bg-green-50 border-green-200 focus:bg-green-50"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="stainHrs">Stain Hours</Label>
-                <Input
-                  id="stainHrs"
-                  type="number"
-                  min="0"
-                  value={formData.stainHrs}
-                  onChange={(e) => handleInputChange('stainHrs', parseInt(e.target.value) || 0)}
-                  placeholder="80"
-                  disabled={isSubmitting}
-                  className="bg-orange-50 border-orange-200 focus:bg-orange-50"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="installHrs">Install Hours</Label>
-                <Input
-                  id="installHrs"
-                  type="number"
-                  min="0"
-                  value={formData.installHrs}
-                  onChange={(e) => handleInputChange('installHrs', parseInt(e.target.value) || 0)}
-                  placeholder="102"
-                  disabled={isSubmitting}
-                  className="bg-purple-50 border-purple-200 focus:bg-purple-50"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Install Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !installDate && "text-muted-foreground"
-                    )}
-                    disabled={isSubmitting}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {installDate ? format(installDate, "PPP") : <span>Pick install date</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={installDate}
-                    onSelect={handleInstallDateSelect}
-                    initialFocus
-                    className="p-3 pointer-events-auto"
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Form */}
+        <div className="lg:col-span-2">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Basic Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Project Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="jobName">Job Name *</Label>
+                    <Input
+                      id="jobName"
+                      value={formData.jobName}
+                      onChange={(e) => handleInputChange('jobName', e.target.value)}
+                      placeholder="Enter job name"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="status">Status</Label>
+                    <Select value={formData.status} onValueChange={(value) => handleInputChange('status', value)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="planning">Planning</SelectItem>
+                        <SelectItem value="shop">In Shop</SelectItem>
+                        <SelectItem value="stain">Staining</SelectItem>
+                        <SelectItem value="install">Installing</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="custom">Custom</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                <div>
+                  <Label htmlFor="jobDescription">Job Description</Label>
+                  <Textarea
+                    id="jobDescription"
+                    value={formData.jobDescription}
+                    onChange={(e) => handleInputChange('jobDescription', e.target.value)}
+                    placeholder="Enter job description"
+                    rows={3}
                   />
-                </PopoverContent>
-              </Popover>
-              
-              {dateWarning && (
-                <div className="flex items-center gap-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
-                  <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                  <span className="text-sm text-yellow-800">{dateWarning}</span>
                 </div>
-              )}
-            </div>
+              </CardContent>
+            </Card>
 
-            {/* Material Order Date Control */}
-            <div className="space-y-3">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="material-order"
-                  checked={requiresMaterialOrder}
-                  onCheckedChange={handleMaterialOrderToggle}
-                  disabled={isSubmitting}
-                />
-                <Label htmlFor="material-order" className="text-sm font-medium">
-                  Requires Material Order Date
-                </Label>
-              </div>
-              
-              {requiresMaterialOrder && materialOrderDate && (
-                <div className="p-3 bg-red-100 border border-red-200 rounded-md">
-                  <p className="text-sm font-semibold text-red-700 text-center">
-                    {formData.jobName ? `${formData.jobName} Material Order Date: ` : 'Material Order Date: '}
-                    {format(materialOrderDate, 'PPP')}
-                  </p>
+            {/* Phase Hours */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Phase Hours</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <Label htmlFor="millworkHrs">Millwork Hours</Label>
+                    <Input
+                      id="millworkHrs"
+                      type="number"
+                      min="0"
+                      value={formData.millworkHrs}
+                      onChange={(e) => handleInputChange('millworkHrs', parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="boxConstructionHrs">Box Construction Hours</Label>
+                    <Input
+                      id="boxConstructionHrs"
+                      type="number"
+                      min="0"
+                      value={formData.boxConstructionHrs}
+                      onChange={(e) => handleInputChange('boxConstructionHrs', parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="stainHrs">Stain Hours</Label>
+                    <Input
+                      id="stainHrs"
+                      type="number"
+                      min="0"
+                      value={formData.stainHrs}
+                      onChange={(e) => handleInputChange('stainHrs', parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="installHrs">Install Hours</Label>
+                    <Input
+                      id="installHrs"
+                      type="number"
+                      min="0"
+                      value={formData.installHrs}
+                      onChange={(e) => handleInputChange('installHrs', parseInt(e.target.value) || 0)}
+                    />
+                  </div>
                 </div>
-              )}
-              
-              {!requiresMaterialOrder && (
-                <div className="p-2 bg-gray-100 border border-gray-200 rounded-md">
-                  <p className="text-sm text-gray-600 text-center">
-                    No material order date required for this project
-                  </p>
-                </div>
-              )}
-            </div>
+              </CardContent>
+            </Card>
 
-            <div className="flex gap-3 pt-4">
-              <Button type="submit" className="flex-1" disabled={isSubmitting}>
-                {isSubmitting ? (isEditing ? 'Saving...' : 'Adding...') : (isEditing ? 'Save Changes' : 'Add Project')}
-              </Button>
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={onCancel} 
-                className="flex-1"
-                disabled={isSubmitting}
-              >
-                Cancel
+            {/* Install Date */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Install Date</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div>
+                  <Label>Install Date *</Label>
+                  <Popover open={installDateOpen} onOpenChange={setInstallDateOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal mt-2",
+                          !formData.installDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {formData.installDate ? format(parseISO(formData.installDate), 'PPP') : 'Select install date'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={formData.installDate ? parseISO(formData.installDate) : undefined}
+                        onSelect={handleInstallDateSelect}
+                        disabled={(date) => date < new Date()}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Submit Button */}
+            <div className="flex justify-end">
+              <Button type="submit" disabled={isSubmitting} className="flex items-center gap-2">
+                <Save className="h-4 w-4" />
+                {isSubmitting ? 'Saving...' : (isEditing ? 'Update Project' : 'Create Project')}
               </Button>
             </div>
           </form>
         </div>
-      </div>
 
-      {/* Right Side - Simplified Assignment Manager with Independent Scroll */}
-      <div className="flex-1 pl-6">
-        <div className="h-full flex flex-col">
-          <div className="flex items-center gap-3 mb-4">
-            <Users className="h-6 w-6 text-blue-600" />
-            <h3 className="text-xl font-semibold">Team Assignments</h3>
-            <div className="text-sm text-muted-foreground ml-auto">
-              Quick assign team members
-            </div>
-          </div>
-          
-          <ScrollArea className="flex-1">
-            <div className="pr-4">
-              {isEditing && projectToEdit ? (
-                <SimplifiedAssignmentManager project={projectToEdit} />
-              ) : (
-                <div className="space-y-4">
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <h4 className="font-medium text-blue-900 mb-2">Assign After Creation</h4>
-                    <p className="text-sm text-blue-800 mb-3">
-                      Once created, you can quickly assign team members:
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 text-sm text-blue-700">
-                      <div>• <strong>Millwork:</strong> {formData.millworkHrs}h</div>
-                      <div>• <strong>Boxes:</strong> {formData.boxConstructionHrs}h</div>
-                      <div>• <strong>Stain:</strong> {formData.stainHrs}h</div>
-                      <div>• <strong>Install:</strong> {formData.installHrs}h</div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </ScrollArea>
+        {/* Assignment Manager */}
+        <div className="lg:col-span-1">
+          {isEditing && projectToEdit && (
+            <ProjectAssignmentManager project={projectToEdit} />
+          )}
         </div>
       </div>
     </div>

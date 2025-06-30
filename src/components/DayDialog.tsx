@@ -12,7 +12,7 @@ import { useProjects } from '@/hooks/useProjects';
 import { AlertTriangle, Trash2, Clock, Plus, X } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import HourAllocationDialog from './HourAllocationDialog';
+import CapacityManagementDialog from './CapacityManagementDialog';
 import CustomProjectDialog from './CustomProjectDialog';
 
 interface DayDialogProps {
@@ -29,7 +29,7 @@ interface DayDialogProps {
 const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open, onOpenChange, onNoteUpdate }: DayDialogProps) => {
   const [currentProjectNotes, setCurrentProjectNotes] = React.useState<Record<string, string>>({});
   const [currentDailyNote, setCurrentDailyNote] = React.useState('');
-  const [showHourAllocation, setShowHourAllocation] = React.useState(false);
+  const [showCapacityManagement, setShowCapacityManagement] = React.useState(false);
   const [showCustomProject, setShowCustomProject] = React.useState(false);
   const [newProjectContext, setNewProjectContext] = React.useState<{ projectId: string; phase: string } | null>(null);
   
@@ -207,46 +207,8 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
     
     // Add a delay to allow data to refresh before opening the dialog
     setTimeout(() => {
-      setShowHourAllocation(true);
+      setShowCapacityManagement(true);
     }, 500);
-  };
-
-  // Create a proper ProjectPhase object for the new project context
-  const getInitialProjectPhase = (): ProjectPhase | null => {
-    try {
-      if (selectedPhase) {
-        console.log('🎯 Using selected phase:', selectedPhase);
-        return selectedPhase;
-      }
-      
-      if (newProjectContext) {
-        console.log('🎯 Using new project context:', newProjectContext);
-        // Find the project phase from the phases array
-        const projectPhase = phases.find(p => 
-          p.projectId === newProjectContext.projectId && 
-          p.phase === newProjectContext.phase
-        );
-        
-        if (projectPhase) {
-          return projectPhase;
-        }
-        
-        // If not found in phases (newly created project), create a minimal phase object
-        const projectFromPhases = phases.find(p => p.projectId === newProjectContext.projectId);
-        if (projectFromPhases) {
-          return {
-            ...projectFromPhases,
-            phase: newProjectContext.phase as 'millwork' | 'boxConstruction' | 'stain' | 'install',
-            id: `${newProjectContext.projectId}-${newProjectContext.phase}`,
-          };
-        }
-      }
-      
-      return null;
-    } catch (error) {
-      console.error('❌ Error getting initial project phase:', error);
-      return null;
-    }
   };
 
   // Check if a project is a custom project (based on naming pattern or other indicators)
@@ -272,12 +234,12 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
             {/* Hour Allocation and Custom Project Management Buttons */}
             <div className="grid grid-cols-2 gap-3">
               <Button 
-                onClick={() => setShowHourAllocation(true)}
+                onClick={() => setShowCapacityManagement(true)}
                 className="flex items-center gap-2"
                 variant="outline"
               >
                 <Clock className="h-4 w-4" />
-                Manage Hour Allocations
+                Manage Capacity & Hours
               </Button>
               <Button 
                 onClick={() => setShowCustomProject(true)}
@@ -404,17 +366,10 @@ const DayDialog = ({ date, phases, projectNotes, dailyNote, selectedPhase, open,
         </DialogContent>
       </Dialog>
 
-      <HourAllocationDialog
+      <CapacityManagementDialog
         date={date}
-        phases={phases}
-        initialProjectPhase={getInitialProjectPhase()}
-        open={showHourAllocation}
-        onOpenChange={(open) => {
-          setShowHourAllocation(open);
-          if (!open) {
-            setNewProjectContext(null);
-          }
-        }}
+        open={showCapacityManagement}
+        onOpenChange={setShowCapacityManagement}
       />
 
       <CustomProjectDialog
