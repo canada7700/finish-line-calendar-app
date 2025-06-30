@@ -26,8 +26,13 @@ export const useProjectRescheduling = (isDragInProgress: boolean = false) => {
       let recalculatedProject: Project;
 
       if (isSettingInstallEnd) {
+        // Create updated project with new install end date
+        const updatedProject = {
+          ...project,
+          installDate: format(newInstallDate, 'yyyy-MM-dd')
+        };
         // Calculate from install end date (when dragging last install day)
-        recalculatedProject = await ProjectScheduler.calculateProjectDatesFromInstallEnd(project, newInstallDate);
+        recalculatedProject = await ProjectScheduler.calculateProjectDatesFromInstallEnd(updatedProject);
       } else {
         // Create updated project with new install start date (standard behavior)
         const updatedProject = {

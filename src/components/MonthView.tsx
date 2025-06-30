@@ -2,10 +2,10 @@
 import React from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, startOfWeek, endOfWeek } from 'date-fns';
 import { ProjectPhase } from '../types/project';
-import { DroppableCalendarDay } from './DroppableCalendarDay';
+import DroppableCalendarDay from './DroppableCalendarDay';
 import { PhaseFilter } from './PhaseFilter';
 import { useDailyCapacityStatus } from '../hooks/useDailyCapacityStatus';
-import { CapacityStatusIndicator } from './CapacityStatusIndicator';
+import CapacityStatusIndicator from './CapacityStatusIndicator';
 
 interface MonthViewProps {
   currentDate: Date;
@@ -49,11 +49,6 @@ export default function MonthView({
 
   return (
     <div className="space-y-4">
-      <PhaseFilter
-        enabledPhases={enabledPhases}
-        onPhaseToggle={onPhaseToggle}
-      />
-      
       <div className="bg-card rounded-lg border">
         <div className="grid grid-cols-7 border-b">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
@@ -79,18 +74,27 @@ export default function MonthView({
                         {format(day, 'd')}
                       </span>
                       {dayCapacityStatus && (
-                        <CapacityStatusIndicator status={dayCapacityStatus.status} size="sm" />
+                        <CapacityStatusIndicator status={dayCapacityStatus} size="sm" />
                       )}
                     </div>
                     
                     <DroppableCalendarDay
                       date={day}
-                      phases={dayPhases}
-                      selectedPhase={selectedPhase}
-                      onPhaseSelect={onPhaseSelect}
-                      onDayClick={onDayClick}
-                      isCurrentMonth={isCurrentMonth}
-                    />
+                      holidays={new Map()}
+                      onProjectDrop={() => {}}
+                    >
+                      <div className="flex-1 space-y-1">
+                        {dayPhases.map(phase => (
+                          <div
+                            key={phase.id}
+                            className={`text-xs p-1 rounded ${phase.color} text-white cursor-pointer`}
+                            onClick={() => onDayClick(day, phase)}
+                          >
+                            {phase.projectName} - {phase.phase}
+                          </div>
+                        ))}
+                      </div>
+                    </DroppableCalendarDay>
                   </div>
                 </div>
               </div>

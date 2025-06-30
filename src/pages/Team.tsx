@@ -1,5 +1,4 @@
 
-import TeamMemberManager from '../components/TeamMemberManager';
 import TeamWorkloadOverview from '../components/TeamWorkloadOverview';
 
 const Team = () => {
@@ -9,12 +8,12 @@ const Team = () => {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Team Management</h1>
           <p className="text-muted-foreground">
-            Manage your team members and their work capacity for project assignments.
+            Team management has been replaced with capacity-based scheduling. 
+            Configure daily phase capacities in the Settings page.
           </p>
         </div>
         
         <TeamWorkloadOverview />
-        <TeamMemberManager />
       </div>
     </div>
   );

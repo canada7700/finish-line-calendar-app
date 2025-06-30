@@ -1,3 +1,4 @@
+
 import { useState, useRef, useMemo, useEffect, useLayoutEffect } from 'react';
 import { ProjectPhase } from '../types/project';
 import { addMonths, format } from 'date-fns';
@@ -224,10 +225,13 @@ export const CalendarView = ({ phases, onDragStateChange }: CalendarViewProps) =
             monthsToRender.map(month => (
               <div key={month.toISOString()}>
                 <MonthView 
-                  monthDate={month} 
+                  currentDate={month} 
                   phases={filteredPhases} 
-                  holidays={holidays} 
-                  showCapacityView={showCapacityView}
+                  selectedPhase={null}
+                  onPhaseSelect={() => {}}
+                  onDayClick={() => {}}
+                  enabledPhases={new Set(selectedPhases)}
+                  onPhaseToggle={() => {}}
                 />
               </div>
             ))
